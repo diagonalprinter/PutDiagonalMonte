@@ -1,104 +1,88 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
-import time
 
-# THIS LINE IS THE KEY TO FULL SCREEN GLORY
-st.set_page_config(page_title="DOS MATRIX DIAGONAL", layout="wide")
+# ── PRESIDENTIAL CONFIG ─────────────────────────────
+st.set_page_config(page_title="DEBIT PUT DIAGONAL • EXECUTIVE", layout="wide")
 
-# ── 3-SECOND MATRIX RAIN INTRO ─────────────────────
-placeholder = st.empty()
-with placeholder.container():
-    st.markdown("""
-    <style>
-    @keyframes fall {
-        0% { transform: translateY(-100vh); opacity: 0; }
-        20% { opacity: 1; }
-        80% { opacity: 1; }
-        100% { transform: translateY(100vh); opacity: 0; }
-    }
-    .matrix-char {
-        color: #00ff41;
-        font-family: 'Courier New', monospace;
-        font-weight: bold;
-        position: absolute;
-        animation: fall 10s linear infinite;
-        font-size: 20px;
-    }
-    </style>
-    <div style="background:#000;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-direction:column;">
-        <h1 style="color:#00ff41;font-family:'Courier New';font-size:5rem;text-shadow:0 0 40px #00ff41;">
-            ACCESSING CONSTRUCT...
-        </h1>
-        <p style="color:#00ff41;font-size:2.8rem;margin-top:50px;">DEBIT PUT DIAGONAL • FULLSCREEN</p>
-    """ + "".join(
-        f"<div class='matrix-char' style='left:{i*2}%;animation-delay:{j*0.15}s;top:-50px;'>"
-        f"{np.random.choice(list('01アイウエオカキクケコサシスセソタチツテトナニヌネノ'))}</div>"
-        for i in range(60) for j in range(20)
-    ) + "</div>", unsafe_allow_html=True)
-    time.sleep(3.2)
-placeholder.empty()
-
-# ── FULLSCREEN DOS THEME ─────────────────────────────
+# ── WHITE HOUSE / BLACKROCK AESTHETIC ───────────────
 st.markdown("""
 <style>
-    .stApp {background:#000 !important; margin:0; padding:0;}
-    h1,h2,h3,label,div,span,p,input {font-family:'Courier New',monospace !important;color:#00ff41 !important;font-weight:bold !important;}
-    .stButton>button {background:#000;color:#00ff41;border:4px solid #ff0000;font-size:1.6rem;padding:15px 50px;}
-    input,.stTextInput>div>div>input,.stNumberInput>div>div>input {background:#000 !important;color:#00ff41 !important;border:3px solid #00ff41 !important;}
-    .red-border {border:5px solid #ff0000;padding:30px;margin:20px 0;background:#001100;border-radius:12px;}
-    .section-title {font-size:2.2rem;border-bottom:6px solid #ff0000;padding-bottom:15px;margin-bottom:25px;}
+    @import url('https://rsms.me/inter/inter.css');
+    html, body, .stApp {background: #0b1120; font-family: 'Inter', sans-serif;}
+    h1, h2, h3, h4 {color: #e8f0ff; font-weight: 700; letter-spacing: -0.5px;}
+    .stMarkdown, label, .stSelectbox > div > div, p {color: #c0d6ff !important;}
+    .css-1d391kg, .css-1v0mbdj {background: transparent;}
+    .glass {background: rgba(20, 25, 50, 0.65); backdrop-filter: blur(12px); border-radius: 16px; 
+            border: 1px solid rgba(100, 140, 255, 0.2); padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);}
+    .gold {color: #d4af37;}
+    .stButton>button {
+        background: linear-gradient(135deg, #1e40af, #1e3a8a); color: white; 
+        border: none; border-radius: 12px; padding: 14px 40px; font-size: 1.1rem; font-weight: 600;
+        box-shadow: 0 4px 20px rgba(30,64,175,0.4);}
+    .stButton>button:hover {background: #1e40af; transform: translateY(-2px);}
+    input, .stNumberInput > div > div > input {background: rgba(15,20,40,0.8) !important; 
+        color: white !important; border: 1px solid #3b82f6 !important; border-radius: 8px;}
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align:center;margin:30px 0;'>DEBIT PUT DIAGONAL • FULLSCREEN EDITION</h1>", unsafe_allow_html=True)
-st.markdown("<h2 style='text-align:center;color:#00ff41;margin-bottom:50px;'>COMPOUNDING KELLY • BLACK SWAN • 1987 TERMINAL</h2>", unsafe_allow_html=True)
+# Header
+st.markdown("<h1 style='text-align:center; color:#e8f0ff; margin-bottom:8px;'>DEBIT PUT DIAGONAL</h1>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align:center; color:#94a3b8; margin-top:0; margin-bottom:40px; letter-spacing:1px;'>EXECUTIVE RISK & COMPOUNDING ENGINE</h2>", unsafe_allow_html=True)
 
-# ── TRUE EDGE-TO-EDGE COLUMNS ───────────────────────
+# ── TWO WIDE, INSTITUTIONAL COLUMNS ─────────────────────
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("<div class='red-border'><div class='section-title'>EDGE PARAMETERS</div>", unsafe_allow_html=True)
-    win_rate = st.slider("Win Rate (%)", 0.0, 100.0, 96.0, 0.1)/100
-    avg_winner = st.number_input("Avg Winner (gross)", 230, step=10)
-    avg_loser = st.number_input("Avg Loser (gross)", -1206, step=50)
+    st.markdown("<div class='glass'>", unsafe_allow_html=True)
+    st.markdown("### Core Edge Parameters")
+    win_rate = st.slider("Win Rate (%)", 0.0, 100.0, 96.0, 0.1, help="Historical closed-trade win rate") / 100
+    avg_winner = st.number_input("Avg Winner (gross $)", 230, step=10)
+    avg_loser = st.number_input("Avg Loser (gross $)", -1206, step=50)
     debit = st.number_input("Debit per Spread ($)", 1400, step=50)
     commission = st.number_input("Commission RT ($)", 1.30, step=0.10)
-    slippage = st.number_input("Slippage Buffer ($)", 80, step=10)
-    start_bal = st.number_input("Starting Balance ($)", 100000, step=10000)
+    slippage = st.number_input("Slippage/Assignment Buffer ($)", 80, step=10)
+    start_bal = st.number_input("Starting Capital ($)", 100000, step=10000, format="%d")
     st.markdown("</div>", unsafe_allow_html=True)
 
 with col2:
-    st.markdown("<div class='red-border'><div class='section-title'>SIMULATION & STRESS TEST</div>", unsafe_allow_html=True)
-    num_trades = st.slider("Trades", 100, 5000, 1200)
-    num_paths = st.slider("Monte Carlo Paths", 10, 1000, 300)
-    max_contracts = st.number_input("Max Contracts", 1, 1000, 10)
-    bpr = st.slider("Buying Power Reduction (%)", 20, 90, 50)/100
+    st.markdown("<div class='glass'>", unsafe_allow_html=True)
+    st.markdown("### Simulation & Institutional Stress")
+    num_trades = st.slider("Number of Trades", 100, 5000, 1200, step=100)
+    num_paths = st.slider("Monte Carlo Paths", 10, 1000, 300, step=50)
+    max_contracts = st.number_input("Maximum Contracts per Trade", 1, 2000, 10)
+    bpr = st.slider("Buying Power Reduction (%)", 20, 90, 50, help="Margin + psychological buffer") / 100
 
+    st.markdown("**Catastrophic Risk Controls**")
     swan = st.checkbox("Black Swan Events", True)
     if swan:
-        swan_freq = st.number_input("Frequency (1 in X)", 100, 2000, 500)
-        swan_mag = st.number_input("Magnitude (× loser)", 2.0, 20.0, 6.0, 0.5)
+        c1, c2 = st.columns(2)
+        with c1: swan_freq = st.number_input("Frequency (1 in X)", 100, 3000, 500)
+        with c2: swan_mag = st.number_input("Magnitude (× loser)", 2.0, 30.0, 6.0, 0.5)
 
     cluster = st.checkbox("Losing Streak Clustering", True)
     if cluster:
-        cluster_mult = st.slider("Win rate multiplier in streak", 0.2, 0.9, 0.6, 0.05)
-        max_streak = st.number_input("Max streak length", 1, 12, 5)
+        c3, c4 = st.columns(2)
+        with c3: cluster_mult = st.slider("Win-rate multiplier in streak", 0.1, 0.9, 0.6, 0.05)
+        with c4: max_streak = st.number_input("Max streak length", 1, 15, 5)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ── KELLY ───────────────────────────────────────────
+# ── Kelly Calculation
 net_win = avg_winner - 2*commission
 net_loss = avg_loser - 2*commission - slippage
-p = win_rate
 b = abs(net_win)/debit if debit > 0 else 0
-kelly_f = max(0, min((p*b - (1-p))/b if b>0 else 0, 0.5))
+kelly_f = max(0, min((win_rate*b - (1-win_rate))/b if b>0 else 0, 0.5))
 
-st.sidebar.markdown(f"**KELLY f = {kelly_f:.1%}**")
-st.sidebar.markdown(f"**Net Win ${net_win:.0f} | Net Loss ${net_loss:.0f}**")
+# Sidebar metrics
+with st.sidebar:
+    st.markdown("### Position Sizing")
+    st.markdown(f"**Kelly Fraction**: {kelly_f:.1%}")
+    st.markdown(f"**Net Winner**: ${net_win:,.0f}")
+    st.markdown(f"**Net Loser**: ${net_loss:,.0f}")
 
-# ── SIMULATION ───────────────────────────────────────
-if st.button("EXECUTE SIMULATION", type="primary"):
-    with st.spinner("CRUNCHING REALITIES..."):
+# ── EXECUTE
+if st.button("RUN EXECUTIVE SIMULATION", type="primary"):
+    with st.spinner("Executing institutional-grade simulation..."):
         paths = []
         for _ in range(num_paths):
             bal = start_bal
@@ -127,31 +111,32 @@ if st.button("EXECUTE SIMULATION", type="primary"):
         mean = np.mean(paths, axis=0)
         finals = paths[:, -1]
 
-        # FULLSCREEN GRAPHS — TRUE 100% WIDTH
+        # Executive charts
+        st.markdown("<div class='glass'>", unsafe_allow_html=True)
         fig = go.Figure()
         for p in paths:
-            fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1, color='rgba(0,255,65,0.05)'), showlegend=False, hoverinfo='skip'))
-        fig.add_trace(go.Scatter(y=mean, mode='lines', name='MEAN PATH', line=dict(color='#00ff41', width=9)))
-        fig.add_hline(y=start_bal, line_color="#ff0000", line_dash="dot")
-        fig.update_layout(height=700, template="plotly_dark", plot_bgcolor="#000", paper_bgcolor="#000",
-                          font=dict(color="#00ff41", size=15), title="COMPOUNDING EQUITY PATHS")
+            fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1, color='rgba(100,180,255,0.08)'), showlegend=False, hoverinfo='skip'))
+        fig.add_trace(go.Scatter(y=mean, mode='lines', name='Mean Path', line=dict(color='#60a5fa', width=6)))
+        fig.add_hline(y=start_bal, line_color="#e11d48", line_dash="dot", annotation_text="Starting Capital")
+        fig.update_layout(height=680, template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                          font=dict(color="#e8f0ff", size=14), title="Compounding Equity Paths – Institutional View")
         st.plotly_chart(fig, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
+        st.markdown("<div class='glass'>", unsafe_allow_html=True)
         fig2 = go.Figure()
-        fig2.add_trace(go.Histogram(x=finals, nbinsx=90, marker_color='#00ff41'))
-        fig2.add_vline(x=start_bal, line_color="#ff0000")
-        fig2.update_layout(height=520, template="plotly_dark", plot_bgcolor="#000", paper_bgcolor="#000",
-                           font=dict(color="#00ff41", size=15), title="FINAL BALANCE DISTRIBUTION")
+        fig2.add_trace(go.Histogram(x=finals, nbinsx=80, marker_color='#60a5fa', name='Final Balance'))
+        fig2.add_vline(x=start_bal, line_color="#e11d48", annotation_text="Breakeven")
+        fig2.update_layout(height=480, template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                           font=dict(color="#e8f0ff"), title="Terminal Wealth Distribution")
         st.plotly_chart(fig2, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("AVG FINAL", f"${finals.mean():,.0f}")
-        c2.metric("MEDIAN", f"${np.median(finals):,.0f}")
-        c3.metric("WIN PATHS", f"{(finals>start_bal).mean()*100:.1f}%")
-        c4.metric("RUIN RISK", f"{(finals<=5000).mean()*100:.2f}%")
+        with c1: st.metric("Average Final Capital", f"${finals.mean():,.0f}")
+        with c2: st.metric("Median Final Capital", f"${np.median(finals):,.0f}")
+        with c3: st.metric("Profitable Paths", f"{(finals>start_bal).mean():.1%}")
+        with c4: st.metric("Ruin Probability (<$5k)", f"{(finals<=5000).mean():.2%}")
 
-st.markdown(
-    "<p style='text-align:center;color:#ff0000;font-size:1.6rem;margin-top:80px;letter-spacing:6px;'>"
-    "THERE IS NO SPOON • ONLY EDGE • 1987-2025</p>",
-    unsafe_allow_html=True
-)
+st.markdown("<p style='text-align:center; color:#64748b; margin-top:80px; font-size:0.9rem;'>"
+            "CLASSIFIED • EXECUTIVE LEVEL CLEARANCE • 2025</p>", unsafe_allow_html=True)
