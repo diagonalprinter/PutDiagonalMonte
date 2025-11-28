@@ -28,9 +28,9 @@ col1, col2 = st.columns(2)
 with col1:
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
     st.markdown("### Core Edge Parameters")
-    win_rate = st.slider("Win Rate (%)", 0.0, 100.0, 96.0, 0.1)/100
+    win_rate = st.slider("Win Rate (%)", 0.0, 100.0, 96.0, 0.1) / 100
     avg_winner = st.number_input("Avg Winner (gross $)", value=230, step=10, format="%d")
-    avg_loser  = st.number_input("Avg Loser (gross $)",  value=-1206, step=50, format="%d")   # ← NOW FULLY UNRESTRICTED
+    avg_loser  = st.number_input("Avg Loser (gross $)", value=-1206, step=50, format="%d")   # ← FULLY UNRESTRICTED
     debit = st.number_input("Debit per Spread ($)", value=1400, step=50)
     commission = st.number_input("Commission RT ($)", value=1.30, step=0.10)
     slippage = st.number_input("Slippage/Assignment Buffer ($)", value=80, step=10)
@@ -43,40 +43,92 @@ with col2:
     num_trades = st.slider("Number of Trades", 100, 5000, 1200)
     num_paths = st.slider("Monte Carlo Paths", 10, 1000, 300)
     max_contracts = st.number_input("Max Contracts", 1, 2000, 10)
-    bpr = st.slider("Buying Power Reduction (%)", 20, 90, 50)/100
+    bpr = st.slider("Buying Power Reduction (%)", 20, 90, 50) / 100
 
     st.markdown("**Catastrophic Controls**")
     swan = st.checkbox("Black Swan Events", True)
     if swan:
-        c1,c2 = st.columns(2)
+        c1, c2 = st.columns(2)
         with c1: swan_freq = st.number_input("Frequency (1 in X)", 100, 3000, 500)
         with c2: swan_mag = st.number_input("Magnitude (× loser)", 2.0, 30.0, 6.0, 0.5)
 
     cluster = st.checkbox("Losing Streak Clustering", True)
     if cluster:
-        c3,c4 = st.columns(2)
+        c3, c4 = st.columns(2)
         with c3: cluster_mult = st.slider("Win-rate multiplier in streak", 0.1, 0.9, 0.6, 0.05)
         with c4: max_streak = st.number_input("Max streak length", 1, 15, 5)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# Kelly
+# ── Kelly Calculation
 net_win = avg_winner - 2*commission
 net_loss = avg_loser - 2*commission - slippage
-b = abs(net_win)/debit if debit>0 else 0
-kelly_f = max(0, min((win_rate*b - (1-win_rate))/b if b>0 else 0, 0.5))
+b = abs(net_win) / debit if debit > 0 else 0
+kelly_f = max(0, min((win_rate * b - (1 - win_rate)) / b if b > 0 else 0, 0.5))
 
-with st.sidebar.markdown(f"**Kelly Fraction** {kelly_f:.1%}")
- st.sidebar.markdown(f"**Net Winner** ${net_win:,.0f}")
- st.sidebar.markdown(f"**Net Loser** ${net_loss:,.0f}")
+# ── Sidebar (fixed syntax)
+st.sidebar.markdown("### Position Sizing")
+st.sidebar.markdown(f"**Kelly Fraction**  {kelly_f:.1%}")
+st.sidebar.markdown(f"**Net Winner**  ${net_win:,.0f}")
+st.sidebar.markdown(f"**Net Loser**  ${net_loss:,.0f}")
 
+# ── RUN SIMULATION
 if st.button("RUN EXECUTIVE SIMULATION", type="primary"):
-    # (simulation code unchanged — identical to previous version)
-    # ... [same as before] ...
+    with st.spinner("Executing institutional-grade simulation..."):
+        paths = []
+        for _ in range(num_paths):
+            bal = start_bal
+            path = [bal]
+            streak = 0
+            for _ in range(num_trades):
+                usable = bal * (1 - bpr)
+                contracts = min(max(1, int(kelly_f * usable / debit)), max_contracts)
+                current_p = win_rate * (cluster_mult if cluster and streak > 0 else 1.0)
+                won = np.random.random() < current_p
 
-    # Just showing the key part — everything else is identical
-    # You can paste the full simulation block from the previous message if needed
+                if swan and np.random.random() < 1 / swan_freq:
+                    pnl = net_loss * swan_mag * contracts
+                else:
+                    pnl = (net_win if won else net_loss) * contracts
 
-    st.success("Simulation complete — unrestricted loss mode active")
+                if cluster and not won:
+                    streak = min(np.random.geometric(0.6), max_streak)
+                if streak > 0:
+                    streak -= 1
+
+                bal = max(bal + pnl, 1000)
+                path.append(bal)
+            paths.append(path)
+
+        paths = np.array(paths)
+        mean = np.mean(paths, axis=0)
+        finals = paths[:, -1]
+
+        # Charts
+        st.markdown("<div class='glass'>", unsafe_allow_html=True)
+        fig = go.Figure()
+        for p in paths:
+            fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1, color='rgba(100,180,255,0.08)'), showlegend=False, hoverinfo='skip'))
+        fig.add_trace(go.Scatter(y=mean, mode='lines', name='Mean Path', line=dict(color='#60a5fa', width=6)))
+        fig.add_hline(y=start_bal, line_color="#e11d48", line_dash="dot")
+        fig.update_layout(height=680, template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                          font=dict(color="#e8f0ff", size=14), title="Compounding Equity Paths")
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("<div class='glass'>", unsafe_allow_html=True)
+        fig2 = go.Figure()
+        fig2.add_trace(go.Histogram(x=finals, nbinsx=80, marker_color='#60a5fa'))
+        fig2.add_vline(x=start_bal, line_color="#e11d48")
+        fig2.update_layout(height=480, template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                           font=dict(color="#e8f0ff"), title="Final Wealth Distribution")
+        st.plotly_chart(fig2, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Avg Final", f"${finals.mean():,.0f}")
+        c2.metric("Median", f"${np.median(finals):,.0f}")
+        c3.metric("Win Paths", f"{(finals>start_bal).mean():.1%}")
+        c4.metric("Ruin Risk", f"{(finals<=5000).mean():.2%}")
 
 st.markdown("<p style='text-align:center;color:#64748b;margin-top:80px;font-size:0.9rem;'>"
-            "EXECUTIVE CLEARANCE • UNRESTRICTED LOSS PARAMETERS ENABLED • 2025</p>", unsafe_allow_html=True)
+            "EXECUTIVE CLEARANCE • UNRESTRICTED LOSS PARAMETERS • 2025</p>", unsafe_allow_html=True)
