@@ -70,7 +70,7 @@ st.markdown("<h2 style='text-align:center; color:#00ff41; margin:20px;'>COMPOUND
             unsafe_allow_html=True)
 
 # ── TWO WIDER, LEFT-ALIGNED COLUMNS ───────────────────
-col1, col2 = st.columns([1.2, 1.2])  # 20% wider than before
+col1, col2 = st.columns([1.2, 1.2])
 
 with col1:
     st.markdown("<div class='red-border'><div class='section-title'>EDGE PARAMETERS</div>", unsafe_allow_html=True)
@@ -102,7 +102,7 @@ with col2:
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ── KELLY & SIMULATION (same logic as before) ────────
+# ── KELLY & SIMULATION ───────────────────────────────
 net_win = avg_winner - 2*commission
 net_loss = avg_loser - 2*commission - slippage
 p = win_rate
@@ -142,7 +142,7 @@ if st.button("EXECUTE SIMULATION", type="primary"):
         mean = np.mean(paths, axis=0)
         finals = paths[:, -1]
 
-        # BIGGER GRAPHS (35% larger)
+        # BIG GRAPHS
         fig = go.Figure()
         for p in paths:
             fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1, color='rgba(0,255,65,0.06)'), showlegend=False, hoverinfo='skip'))
@@ -165,5 +165,6 @@ if st.button("EXECUTE SIMULATION", type="primary"):
         c3.metric("WIN PATHS", f"{(finals>start_bal).mean()*100:.1f}%")
         c4.metric("RUIN RISK", f"{(finals<=5000).mean()*100:.2f}%")
 
-st.markdown("<p style='text-align:center; color:#ff0000; font-size:1.1rem; margin-top:40px;'>
-            THERE IS NO SPOON • ONLY EDGE • 1987-2025</p>", unsafe_allow_html=True)
+# FIXED FINAL LINE
+st.markdown("<p style='text-align:center; color:#ff0000; font-size:1.1rem; margin-top:40px;'>"
+            "THERE IS NO SPOON • ONLY EDGE • 1987-2025</p>", unsafe_allow_html=True)
