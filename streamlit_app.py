@@ -27,7 +27,7 @@ with placeholder.container():
         <h1 style="color:#00ff41;font-family:'Courier New';font-size:4.5rem;text-shadow:0 0 30px #00ff41;">
             ACCESSING CONSTRUCT...
         </h1>
-        <p style="color:#00ff41;font-size:2.3rem;margin-top:40px;">DEBIT PUT DIAGONAL vULTIMATE</p>
+        <p style="color:#00ff41;font-size:2.3rem;margin-top:40px;">DEBIT PUT DIAGONAL v1 GLORY</p>
     """ + "".join(
         f"<div class='matrix-char' style='left:{i*2.3}%;animation-delay:{j*0.2}s;top:-50px;'>"
         f"{np.random.choice(list('01アイウエオカキクケコサシスセソタチツテト'))}</div>"
@@ -36,23 +36,23 @@ with placeholder.container():
     time.sleep(3.0)
 placeholder.empty()
 
-# ── RETRO DOS + FULL MATRIX FONT THEME ─────────────
+# ── RETRO DOS THEME ─────────────────────────────────
 st.markdown("""
 <style>
-    .stApp {background:#000 !important; font-family:'Courier New', monospace !important;}
-    h1,h2,h3,.stMarkdown,label,div,span,p,input {font-family:'Courier New',monospace !important;color:#00ff41 !important;font-weight:bold !important;}
-    .stButton>button {background:#000;color:#00ff41;border:3px solid #ff0000;font-size:1.4rem;padding:10px 30px;}
+    .stApp {background:#000 !important;}
+    h1,h2,h3,.stMarkdown,label,div,span,p,input,.stSlider > div > div > div {font-family:'Courier New',monospace !important;color:#00ff41 !important;font-weight:bold !important;}
+    .stButton>button {background:#000;color:#00ff41;border:3px solid #ff0000;font-size:1.5rem;padding:12px 40px;}
     input,.stTextInput>div>div>input,.stNumberInput>div>div>input {background:#000 !important;color:#00ff41 !important;border:2px solid #00ff41 !important;}
-    .red-border {border: 4px solid #ff0000;padding: 20px;margin: 15px 0;background:#001100;border-radius: 8px;}
-    .section-title {color:#00ff41;font-size:1.8rem;border-bottom:4px solid #ff0000;padding-bottom:10px;margin-bottom:15px;text-align:left;}
+    .red-border {border: 4px solid #ff0000;padding: 25px;margin: 20px 0;background:#001100;border-radius: 10px;}
+    .section-title {color:#00ff41;font-size:2rem;border-bottom:5px solid #ff0000;padding-bottom:12px;margin-bottom:20px;text-align:left;}
 </style>
 """, unsafe_allow_html=True)
 
-st.title("DEBIT PUT DIAGONAL vULTIMATE")
-st.markdown("<h2 style='text-align:center;color:#00ff41;margin-bottom:30px;'>COMPOUNDING KELLY • BLACK SWAN • 1987 TERMINAL EDITION</h2>", unsafe_allow_html=True)
+st.title("DEBIT PUT DIAGONAL v1 GLORY EDITION")
+st.markdown("<h2 style='text-align:center;color:#00ff41;margin-bottom:40px;'>COMPOUNDING KELLY • BLACK SWAN • 1987 TERMINAL</h2>", unsafe_allow_html=True)
 
-# ── SUPER WIDE COLUMNS (75% wider) ─────────────────────
-col1, col2 = st.columns([1.75, 1.75])
+# ── ORIGINAL v1 COLUMN WIDTHS (BACK TO GLORY) ───────
+col1, col2 = st.columns(2)   # ← THIS IS THE ORIGINAL v1 MAGIC
 
 with col1:
     st.markdown("<div class='red-border'><div class='section-title'>EDGE PARAMETERS</div>", unsafe_allow_html=True)
@@ -84,7 +84,7 @@ with col2:
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ── KELLY CALC ─────────────────────────────────────
+# ── KELLY & SIMULATION (unchanged logic) ─────────────
 net_win = avg_winner - 2*commission
 net_loss = avg_loser - 2*commission - slippage
 p = win_rate
@@ -94,7 +94,6 @@ kelly_f = max(0, min((p*b - (1-p))/b if b>0 else 0, 0.5))
 st.sidebar.markdown(f"**KELLY f = {kelly_f:.1%}**")
 st.sidebar.markdown(f"**Net Win ${net_win:.0f} | Net Loss ${net_loss:.0f}**")
 
-# ── SIMULATION & FULL-WIDTH GRAPHS ─────────────────
 if st.button("EXECUTE SIMULATION", type="primary"):
     with st.spinner("INITIALIZING..."):
         paths = []
@@ -125,7 +124,7 @@ if st.button("EXECUTE SIMULATION", type="primary"):
         mean = np.mean(paths, axis=0)
         finals = paths[:, -1]
 
-        # FULL-WIDTH GLORIOUS GRAPHS
+        # ORIGINAL v1 FULL-WIDTH GRAPHS
         fig = go.Figure()
         for p in paths:
             fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1, color='rgba(0,255,65,0.06)'), showlegend=False, hoverinfo='skip'))
@@ -148,9 +147,8 @@ if st.button("EXECUTE SIMULATION", type="primary"):
         c3.metric("WIN PATHS", f"{(finals>start_bal).mean()*100:.1f}%")
         c4.metric("RUIN RISK", f"{(finals<=5000).mean()*100:.2f}%")
 
-# FINAL LINE — FIXED
 st.markdown(
-    "<p style='text-align:center;color:#ff0000;font-size:1.3rem;margin-top:60px;letter-spacing:3px;'>"
+    "<p style='text-align:center;color:#ff0000;font-size:1.4rem;margin-top:70px;letter-spacing:4px;'>"
     "THERE IS NO SPOON • ONLY EDGE • 1987-2025</p>",
     unsafe_allow_html=True
 )
