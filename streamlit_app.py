@@ -9,11 +9,11 @@ with placeholder.container():
     st.markdown("""
     <style>
     @keyframes fall {
-         0% { transform: translateY(-100vh); opacity: 0; }
-  20% { opacity: 1; }
-  80% { opacity: 1; }
-  100% { transform: translateY(100vh); opacity: 0; }
-}
+        0% { transform: translateY(-100vh); opacity: 0; }
+        20% { opacity: 1; }
+        80% { opacity: 1; }
+        100% { transform: translateY(100vh); opacity: 0; }
+    }
     .matrix-char {
         color: #00ff41;
         font-family: 'Courier New', monospace;
@@ -23,7 +23,7 @@ with placeholder.container():
         font-size: 20px;
     }
     </style>
-    <div style="background:#000;height:height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-direction:column;">
+    <div style="background:#000;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-direction:column;">
         <h1 style="color:#00ff41;font-family:'Courier New';font-size:4.5rem;text-shadow:0 0 30px #00ff41;">
             ACCESSING CONSTRUCT...
         </h1>
@@ -41,18 +41,18 @@ st.markdown("""
 <style>
     .stApp {background:#000 !important; font-family:'Courier New', monospace !important;}
     h1,h2,h3,.stMarkdown,label,div,span,p,input {font-family:'Courier New',monospace !important;color:#00ff41 !important;font-weight:bold !important;}
-    .stButton>button {background:#000;color:#00ff41;border:3px solid #ff0000c;font-size:1.4rem;padding:10px 30px;}
+    .stButton>button {background:#000;color:#00ff41;border:3px solid #ff0000;font-size:1.4rem;padding:10px 30px;}
     input,.stTextInput>div>div>input,.stNumberInput>div>div>input {background:#000 !important;color:#00ff41 !important;border:2px solid #00ff41 !important;}
     .red-border {border: 4px solid #ff0000;padding: 20px;margin: 15px 0;background:#001100;border-radius: 8px;}
-    .section-title {color:#00ff41;font-size:1.8rem;border-bottom:4px solid #ff0000;padding-bottom:10px 0;margin-bottom:15px;text-align:left;}
+    .section-title {color:#00ff41;font-size:1.8rem;border-bottom:4px solid #ff0000;padding-bottom:10px;margin-bottom:15px;text-align:left;}
 </style>
 """, unsafe_allow_html=True)
 
 st.title("DEBIT PUT DIAGONAL vULTIMATE")
 st.markdown("<h2 style='text-align:center;color:#00ff41;margin-bottom:30px;'>COMPOUNDING KELLY • BLACK SWAN • 1987 TERMINAL EDITION</h2>", unsafe_allow_html=True)
 
-# ── SUPER WIDE, LEFT-ALIGNED COLUMNS (75% wider than last) ─────
-col1, col2 = st.columns([1.75, 1.75])   # ← THIS IS THE MAGIC
+# ── SUPER WIDE COLUMNS (75% wider) ─────────────────────
+col1, col2 = st.columns([1.75, 1.75])
 
 with col1:
     st.markdown("<div class='red-border'><div class='section-title'>EDGE PARAMETERS</div>", unsafe_allow_html=True)
@@ -94,7 +94,7 @@ kelly_f = max(0, min((p*b - (1-p))/b if b>0 else 0, 0.5))
 st.sidebar.markdown(f"**KELLY f = {kelly_f:.1%}**")
 st.sidebar.markdown(f"**Net Win ${net_win:.0f} | Net Loss ${net_loss:.0f}**")
 
-# ── SIMULATION & FULL-WIDTH GRAPHS (like v1) ────────
+# ── SIMULATION & FULL-WIDTH GRAPHS ─────────────────
 if st.button("EXECUTE SIMULATION", type="primary"):
     with st.spinner("INITIALIZING..."):
         paths = []
@@ -125,7 +125,7 @@ if st.button("EXECUTE SIMULATION", type="primary"):
         mean = np.mean(paths, axis=0)
         finals = paths[:, -1]
 
-        # MASSIVE FULL-WIDTH GRAPHS (original v1 glory)
+        # FULL-WIDTH GLORIOUS GRAPHS
         fig = go.Figure()
         for p in paths:
             fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1, color='rgba(0,255,65,0.06)'), showlegend=False, hoverinfo='skip'))
@@ -133,7 +133,7 @@ if st.button("EXECUTE SIMULATION", type="primary"):
         fig.add_hline(y=start_bal, line_color="#ff0000", line_dash="dot")
         fig.update_layout(height=680, template="plotly_dark", plot_bgcolor="#000", paper_bgcolor="#000",
                           font=dict(color="#00ff41", size=14), title="COMPOUNDING EQUITY PATHS")
-        st.plotly_chart(fig, use_container_width=True)   # ← THIS IS THE KEY: full original width
+        st.plotly_chart(fig, use_container_width=True)
 
         fig2 = go.Figure()
         fig2.add_trace(go.Histogram(x=finals, nbinsx=80, marker_color='#00ff41'))
@@ -148,5 +148,9 @@ if st.button("EXECUTE SIMULATION", type="primary"):
         c3.metric("WIN PATHS", f"{(finals>start_bal).mean()*100:.1f}%")
         c4.metric("RUIN RISK", f"{(finals<=5000).mean()*100:.2f}%")
 
-st.markdown("<p style='text-align:center;color:#ff0000;font-size:1.3rem;margin-top:60px;letter-spacing:3px;'>
-            THERE IS NO SPOON • ONLY EDGE • 1987-2025</p>", unsafe_allow_html=True)
+# FINAL LINE — FIXED
+st.markdown(
+    "<p style='text-align:center;color:#ff0000;font-size:1.3rem;margin-top:60px;letter-spacing:3px;'>"
+    "THERE IS NO SPOON • ONLY EDGE • 1987-2025</p>",
+    unsafe_allow_html=True
+)
