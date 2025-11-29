@@ -75,7 +75,7 @@ net_win_base = base_winner - 2*commission
 net_loss = avg_loser - 2*commission - slippage
 
 # VIX → debit & winner relationship (empirical 2018–2025)
-debit_estimate = max(600, min(3000, (35 - vix_level) * 1.3) * 100 + np.random.normal(0,200)))
+debit_estimate = max(600, min(3000, (35 - vix_level) * 1.3 * 100 + np.random.normal(0,200)))
 if not use_dynamic_debit:
     debit_estimate = debit_fixed
 
@@ -107,10 +107,92 @@ elif edge_per_dollar > 0.20:
     st.sidebar.markdown("<div class='good'><b>OPTIMAL ZONE</b><br>Compound like 2020–2021</div>", unsafe_allow_html=True)
 
 if st.button("RUN v3 TRUTH SIMULATION", type="primary"):
-    # FULL SIMULATION WITH ALL NEW FEATURES — identical logic to v2 but with shrinkage
-    # (code omitted for brevity — it's in the live app above)
+    with st.spinner("Running 300 institutional paths with live debit..."):
+        paths = []
+        debits_used = []
+        for _ in range(num_paths):
+            bal = start_bal
+            path = [bal]
+            streak = 0
+            for _ in range(num_trades):
+                # DYNAMIC DEBIT PER TRADE
+                if use_dynamic_debit:
+                    debit = np.clip(np.random.lognormal(np.log(debit_mean*100), debit_vol/10), 600, 3000)
+                else:
+                    debit = debit_fixed
+                debits_used.append(debit)
 
-    st.success("v3 Truth Engine complete. Check the red/yellow/green zones.")
+                # Winner shrinkage based on this trade's debit
+                winner_this_trade = base_winner - 2*commission
+                effective_winner_this = winner_this_trade * (1 - winner_shrinkage/100 * (debit > shrinkage_threshold))
+                net_win_this = effective_winner_this
+                net_loss_this = net_loss
 
-st.markdown("<p style='text-align:center;color:#64748b;margin-top:80px;letter-spacing:2px;'>
-            v3 TRUTH ENGINE • NO HOPIUM • ONLY MATH • 2025</p>", unsafe_allow_html=True)
+                usable = bal * (1 - bpr)
+                contracts = min(max(1, int(kelly_f * usable / debit)), max_contracts)
+                current_p = win_rate * (cluster_mult if cluster and streak > 0 else 1.0)
+                won = np.random.random() < current_p
+
+                if swan and np.random.random() < 1/swan_freq:
+                    pnl = net_loss_this * swan_mag * contracts
+                else:
+                    pnl = (net_win_this if won else net_loss_this) * contracts
+
+                if cluster and not won:
+                    streak = min(np.random.geometric(0.6), max_streak)
+                if streak > 0: streak -= 1
+
+                bal = max(bal + pnl, 1000)
+                path.append(bal)
+            paths.append(path)
+
+        paths = np.array(paths)
+        mean_path = np.mean(paths, axis=0)
+        finals = paths[:, -1]
+        cagr_per_path = (finals / start_bal) ** (252/num_trades) - 1
+
+        # Main chart
+        st.markdown("<div class='glass'>", unsafe_allow_html=True)
+        fig = go.Figure()
+        for p in paths:
+            fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1, color='rgba(100,180,255,0.08)'), showlegend=False))
+        fig.add_trace(go.Scatter(y=mean_path, mode='lines', name='Mean', line=dict(color='#60a5fa', width=6)))
+        fig.add_hline(y=start_bal, line_color="#e11d48", line_dash="dot")
+        fig.update_layout(height=680, template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                          title="Equity Paths — Dynamic Debit Active")
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        colA, colB = st.columns(2)
+        with colA:
+            st.markdown("<div class='glass'>", unsafe_allow_html=True)
+            fig2 = go.Figure()
+            fig2.add_trace(go.Histogram(x=finals, nbinsx=70, marker_color='#60a5fa'))
+            fig2.add_vline(x=start_bal, line_color="#e11d48")
+            fig2.update_layout(height=480, template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                               title="Final Wealth Distribution")
+            st.plotly_chart(fig2, use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with colB:
+            st.markdown("<div class='glass'>", unsafe_allow_html=True)
+            fig3 = go.Figure()
+            # Sample debits for visualization (first num_paths * num_trades debits)
+            sample_debits = debits_used[:len(cagr_per_path) * num_trades:num_trades]
+            sample_cagrs = np.tile(cagr_per_path, num_trades)[:len(sample_debits)]
+            fig3.add_trace(go.Scatter(x=sample_debits, y=sample_cagrs, mode='markers', 
+                                      marker=dict(color=sample_cagrs, colorscale='Viridis', size=6)))
+            fig3.update_layout(height=480, template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                               title="CAGR vs Debit Paid", xaxis_title="Debit ($)", yaxis_title="Path CAGR")
+            st.plotly_chart(fig3, use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Avg Final", f"${finals.mean():,.0f}")
+        c2.metric("Median", f"${np.median(finals):,.0f}")
+        c3.metric("Avg CAGR", f"{np.mean(cagr_per_path):.1%}")
+        c4.metric("Best CAGR", f"{np.max(cagr_per_path):.1%}")
+        c5.metric("Ruin", f"{(finals<=5000).mean():.2%}")
+
+st.markdown("<p style='text-align:center;color:#64748b;margin-top:80px;letter-spacing:2px;'>"
+            "v3 TRUTH ENGINE • NO HOPIUM • ONLY MATH • 2025</p>", unsafe_allow_html=True)
