@@ -2,22 +2,20 @@ import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 import requests
-from datetime import datetime
 
 st.set_page_config(page_title="DEBIT PUT DIAGONAL v4.1 • TRUTH", layout="wide")
 
-# === LIVE 9D/30D RATIO (Finnhub — real-time, no delay) ===
-@st.cache_data(ttl=10)  # Updates every 10 seconds
+# === LIVE 9D/30D RATIO (Finnhub real-time) ===
+@st.cache_data(ttl=10)
 def get_live_vol_ratio():
     try:
-        # Replace with your free Finnhub key (or use the public demo key below for testing)
-        api_key = "cpj3n29r01qo0c2v7q5gcpj3n29r01qo0c2v7q60"  # Public demo key (rate-limited but works)
+        api_key = "cpj3n29r01qo0c2v7q5gcpj3n29r01qo0c2v7q60"  # public demo key
         vix9d = requests.get(f"https://finnhub.io/api/v1/quote?symbol=^VIX9D&token={api_key}").json().get('c', 18.5)
         vix30d = requests.get(f"https://finnhub.io/api/v1/quote?symbol=^VIX&token={api_key}").json().get('c', 18.1)
         ratio = round(vix9d / vix30d, 3) if vix30d > 0 else 1.000
         return ratio, vix9d, vix30d
     except:
-        return 1.020, 18.5, 18.1  # Safe fallback
+        return 1.020, 18.5, 18.1
 
 live_ratio, vix9d_val, vix30d_val = get_live_vol_ratio()
 
@@ -37,9 +35,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<h1 style='text-align:center;color:#e8f0ff;'>DEBIT PUT DIAGONAL v4.1</h1>", unsafe_allow_html=True)
-st.markdown("<h2 style='text-align:center;color:#94a3b8;margin-bottom:40px;'>LIVE 9D/30D RATIO • TRUE CAGR • NO HOPIUM</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align:center;color:#94a3b8;margin-bottom:40px;'>LIVE 9D/30D • TRUE CAGR • NO HOPIUM</h2>", unsafe_allow_html=True)
 
-# === LIVE RATIO DASHBOARD ===
+# === LIVE RATIO DISPLAY ===
 col_l1, col_l2, col_l3 = st.columns(3)
 with col_l1:
     st.metric("VIX9D", f"{vix9d_val:.2f}")
@@ -60,7 +58,7 @@ col1, col2 = st.columns([1.4, 1])
 
 with col1:
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
-    st.markdown("### Core Edge (Your Historical Truth)")
+    st.markdown("### Core Edge")
     win_rate = st.slider("Win Rate (%)", 80.0, 99.9, 96.0, 0.1) / 100
     base_winner = st.number_input("Base Avg Winner ($)", value=230, step=10)
     avg_loser = st.number_input("Avg Loser ($)", value=-1206, step=50)
@@ -70,7 +68,7 @@ with col1:
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
-    st.markdown("### Regime & Debit Behavior")
+    st.markdown("### Debit Behavior")
     use_dynamic_debit = st.checkbox("Dynamic Debit Distribution", value=True)
     if use_dynamic_debit:
         debit_mean = st.slider("Typical Debit ($×100)", 6, 30, 14)
@@ -99,28 +97,29 @@ with col2:
     cluster = st.checkbox("Loss Clustering", True)
     if cluster:
         c1, c2 = st.columns(2)
-        with c1: cluster_mult = st.slider("Win-rate × in streak", 0.1, 0.9, 0.6, 0.05)
+        with c1: cluster_mult = st.slider("Win-rate multiplier in streak", 0.1, 0.9, 0.6, 0.05)
         with c2: max_streak = st.number_input("Max streak length", 1, 15, 5)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# === LIVE CALCULATIONS (CORRECTED CAGR) ===
+# === CALCULATIONS ===
 net_win_base = base_winner - 2 * commission
 net_loss = avg_loser - 2 * commission - slippage
 
-# Estimate current debit from live ratio (empirical fit)
+# Debit estimate from live ratio
 if live_ratio < 0.85:
     debit_estimate = 2500
 elif live_ratio > 1.15:
     debit_estimate = 900
 else:
-    debit_estimate = 3500 - 2000 * live_ratio  # Linear fit, works amazingly well
+    debit_estimate = 3500 - 2000 * live_ratio
 debit_estimate = np.clip(debit_estimate + np.random.normal(0, 150), 600, 3000)
 
 effective_winner = net_win_base * (1 - winner_shrinkage/100 * (debit_estimate > shrinkage_threshold))
 edge_per_dollar = effective_winner / debit_estimate if debit_estimate > 0 else 0
+
 kelly_f = max(0, min((win_rate * edge_per_dollar - (1 - win_rate)) / edge_per_dollar if edge_per_dollar > 0 else 0, 0.5))
 
-# CORRECTED, EXACT CAGR
+# CORRECT CAGR
 expected_pnl_per_trade = win_rate * effective_winner + (1 - win_rate) * net_loss
 growth_per_trade = kelly_f * (expected_pnl_per_trade / debit_estimate)
 trades_per_year = 250
@@ -128,7 +127,7 @@ theoretical_cagr = (1 + growth_per_trade) ** trades_per_year - 1
 
 breakeven_debit = abs(effective_winner / (win_rate - 0.5)) if win_rate > 0.5 else 99999
 
-# === SIDEBAR TRUTH DASHBOARD ===
+# === SIDEBAR ===
 st.sidebar.markdown("### LIVE TRUTH DASHBOARD")
 st.sidebar.markdown(f"**Live 9D/30D Ratio** {live_ratio:.3f}")
 st.sidebar.markdown(f"**Current Debit (est)** ${debit_estimate:,.0f}")
@@ -141,13 +140,13 @@ st.sidebar.metric("Breakeven Debit", f"${breakeven_debit:,.0f}")
 if theoretical_cagr < 0.25 or edge_per_dollar < 0.10:
     st.sidebar.markdown("<div class='warning'><b>DO NOT TRADE ZONE</b><br>CAGR < 25% or edge too thin</div>", unsafe_allow_html=True)
 elif theoretical_cagr > 1.0:
-    st.sidebar.markdown("<div class='good'><b>GOLDILOCKS PRINTING</b><br>Expected CAGR > 100%</div>", unsafe_allow_html=True)
+    st.sidebar.markdown("<div class='good'><b>GOLDILOCKS PRINTING</b><br>CAGR > 100%</div>", unsafe_allow_html=True)
 else:
     st.sidebar.markdown("<div class='optimal'><b>NORMAL COMPOUNDING</b><br>Steady edge</div>", unsafe_allow_html=True)
 
 # === SIMULATION ===
 if st.button("RUN v4.1 TRUTH SIMULATION", type="primary"):
-    with st.spinner("Running 300 institutional paths..."):
+    with st.spinner("Running 300 paths..."):
         paths = []
         debits_used = []
         for _ in range(num_paths):
@@ -155,7 +154,8 @@ if st.button("RUN v4.1 TRUTH SIMULATION", type="primary"):
             path = [bal]
             streak = 0
             for _ in range(num_trades):
-                debit = np.clip(np.random.lognormal(np.log(debit_mean*100), debit considerazione/10), 600, 3000) if use_dynamic_debit else debit_fixed
+                # FIXED LINE — this was the bug
+                debit = np.clip(np.random.lognormal(np.log(debit_mean*100), debit_vol/10), 600, 3000) if use_dynamic_debit else debit_fixed
                 debits_used.append(debit)
 
                 winner_this = base_winner - 2*commission
@@ -173,7 +173,8 @@ if st.button("RUN v4.1 TRUTH SIMULATION", type="primary"):
 
                 if cluster and not won:
                     streak = min(np.random.geometric(0.6), max_streak)
-                if streak > 0: streak -= 1
+                if streak > 0:
+                    streak -= 1
 
                 bal = max(bal + pnl, 1000)
                 path.append(bal)
@@ -184,14 +185,14 @@ if st.button("RUN v4.1 TRUTH SIMULATION", type="primary"):
         finals = paths[:, -1]
         cagr_per_path = (finals / start_bal) ** (252 / num_trades) - 1
 
-        # === CHARTS ===
+        # Charts
         st.markdown("<div class='glass'>", unsafe_allow_html=True)
         fig = go.Figure()
-        for p in paths[:100]:  # Plot first 100 for speed
+        for p in paths[:100]:
             fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1, color='rgba(100,180,255,0.1)'), showlegend=False))
-        fig.add_trace(go.Scatter(y=mean_path, mode='lines', name='Mean Path', line=dict(color='#60a5fa', width=6)))
+        fig.add_trace(go.Scatter(y=mean_path, mode='lines', name='Mean', line=dict(color='#60a5fa', width=6)))
         fig.add_hline(y=start_bal, line_color="#e11d48", line_dash="dot")
-        fig.update_layout(height=680, template="plotly_dark", title="Equity Paths — Live Regime")
+        fig.update_layout(height=680, template="plotly_dark", title="Equity Paths")
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -200,17 +201,16 @@ if st.button("RUN v4.1 TRUTH SIMULATION", type="primary"):
             st.markdown("<div class='glass'>", unsafe_allow_html=True)
             fig2 = go.Figure(go.Histogram(x=finals, nbinsx=70, marker_color='#60a5fa'))
             fig2.add_vline(x=start_bal, line_color="#e11d48")
-            fig2.update_layout(height=480, template="plotly_dark", title="Final Wealth Distribution")
+            fig2.update_layout(height=480, template="plotly_dark", title="Final Wealth")
             st.plotly_chart(fig2, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with colB:
             st.markdown("<div class='glass'>", unsafe_allow_html=True)
             sample_debits = debits_used[::num_trades][:len(cagr_per_path)]
-            fig3 = go.Figure()
-            fig3.add_trace(go.Scatter(x=sample_debits, y=cagr_per_path, mode='markers',
-                                      marker=dict(color=cagr_per_path, colorscale='Viridis', size=8)))
-            fig3.update_layout(height=480, template="plotly_dark", title="CAGR vs Average Debit Paid")
+            fig3 = go.Figure(go.Scatter(x=sample_debits, y=cagr_per_path, mode='markers',
+                                        marker=dict(color=cagr_per_path, colorscale='Viridis', size=8)))
+            fig3.update_layout(height=480, template="plotly_dark", title="CAGR vs Debit Paid")
             st.plotly_chart(fig3, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
@@ -221,4 +221,4 @@ if st.button("RUN v4.1 TRUTH SIMULATION", type="primary"):
         c4.metric("Best Path", f"{np.max(cagr_per_path):.1%}")
         c5.metric("Ruin Risk", f"{(finals <= 5000).mean():.2%}")
 
-st.markdown("<p style='text-align:center;color:#64748b;margin-top:80px;'>v4.1 TRUTH ENGINE • LIVE 9D/30D • EXACT CAGR • 2025</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;color:#64748b;margin-top:80px;'>v4.1 • LIVE 9D/30D • EXACT MATH • 2025</p>", unsafe_allow_html=True)
