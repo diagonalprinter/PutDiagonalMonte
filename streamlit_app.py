@@ -3,10 +3,10 @@ import numpy as np
 import plotly.graph_objects as go
 import requests
 
-st.set_page_config(page_title="DIAGONAL v5.7 GLOW", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.0", layout="wide")
 
-# === LIVE RATIO ===
-@st.cache_data(ttl=8)
+# === LIVE 9D/30D ===
+@st.cache_data(ttl=10)
 def get_ratio():
     try:
         key = "cpj3n29r01qo0c2v7q5gcpj3n29r01qo0c2v7q60"
@@ -18,84 +18,133 @@ def get_ratio():
 
 live_ratio, vix9d, vix30d = get_ratio()
 
-# === YOUR FINAL REGIME + GLOW ===
-def regime_from_ratio(r):
-    if r <= 0.84:  return {"debit":2650,"shrink":65,"zone":"CONTANGO KILLER","glow":"🔴","color":"#ef4444","shadow":"0 0 30px #ef4444"}
-    if r <= 0.88:  return {"debit":2150,"shrink":25,"zone":"CAUTION ZONE","glow":"🟢","color":"#a3e635","shadow":"0 0 25px #a3e635"}
-    if r <= 0.94:  return {"debit":1650,"shrink":8, "zone":"GOLDILOCKS","glow":"🟢","color":"#22c55e","shadow":"0 0 35px #22c55e"}
-    if r <= 1.04:  return {"debit":1350,"shrink":18,"zone":"ABOVE GOLDILOCKS","glow":"🟢","color":"#22c55e","shadow":"0 0 25px #22c55e"}
-    if r <= 1.12:  return {"debit":950, "shrink":4, "zone":"FOMC / EVENT FLIP","glow":"🔵","color":"#3b82f6","shadow":"0 0 40px #60a5fa"}
-    return                 {"debit":700, "shrink":3, "zone":"MAX SIZE — PRINT","glow":"🟣","color":"#8b5cf6","shadow":"0 0 45px #a78bfa"}
+# === REGIME DEFINITION (your final spec) ===
+def get_regime(r):
+    if r <= 0.84:   return {"debit":2650, "shrink":65, "zone":"OFF",           "color":"#dc2626"}
+    if r <= 0.88:   return {"debit":2150, "shrink":25, "zone":"MARGINAL",      "color":"#f59e0b"}
+    if r <= 0.94:   return {"debit":1650, "shrink":8,  "zone":"OPTIMAL",       "color":"#10b981"}
+    if r <= 1.04:   return {"debit":1350, "shrink":18, "zone":"ACCEPTABLE",    "color":"#10b981"}
+    if r <= 1.12:   return {"debit":950,  "shrink":4,  "zone":"ENHANCED",       "color":"#3b82f6"}
+    return                {"debit":700,  "shrink":3,  "zone":"MAXIMUM",        "color":"#8b5cf6"}
 
-regime = regime_from_ratio(live_ratio)
-avg_debit = regime["debit"] + np.random.normal(0, 80)
-shrinkage = regime["shrink"]
+regime = get_regime(live_ratio)
+avg_debit = regime["debit"] + np.random.normal(0, 70)
+shrinkage_pct = regime["shrink"]
 
-# === GLOWING STYLE ===
-st.markdown(f"""
+# === INSTITUTIONAL STYLE ===
+st.markdown("""
 <style>
-    @import url('https://rsms.me/inter/inter.css');
-    html, body, .stApp {{background:#0b1120; font-family:'Inter',sans-serif;}}
-    .big {{font-size:88px !important; font-weight:900; text-align:center; margin:30px 0;}}
-    .zone {{
-        background:{regime['color']}22;
-        border-left:10px solid {regime['color']};
-        padding:32px;
-        border-radius:20px;
-        text-align:center;
-        margin:30px 0;
-        box-shadow: {regime['shadow']}, 0 8px 32px rgba(0,0,0,0.6);
-        animation: pulse 2s infinite;
-    }}
-    @keyframes pulse {{0%,100% {{opacity:1}} 50% {{opacity:0.9}}}}
-    .glow-text {{font-size:52px; text-shadow: {regime['shadow']};}}
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    html, body, .stApp {background:#0b1120; font-family:'Inter',sans-serif; color:#e2e8f0;}
+    .big-num {font-size:84px; font-weight:700; text-align:center; color:#ffffff; margin:30px 0 10px 0;}
+    .header-bar {background:#1e293b; padding:20px; border-radius:12px; margin-bottom:30px;}
+    .metric-card {background:#1e293b; padding:20px; border-radius:10px; border-left:4px solid v;}
+    .stButton>button {background:#334155; color:white; border:none; border-radius:8px; height:52px; font-size:16px; font-weight:600;}
+    .stButton>button:hover {background:#475569;}
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align:center;color:#e8f0ff;margin:50px 0;'>DIAGONAL v5.7 — GLOW EDITION</h1>", unsafe_allow_html=True)
-st.markdown(f"<div class='big'>{live_ratio}</div>", unsafe_allow_html=True)
-st.markdown(f"<div class='zone'><h2 class='glow-text'>{regime['glow']} {regime['zone']} {regime['glow']}</h2></div>", unsafe_allow_html=True)
+# === HEADER WITH SINGLE TRAFFIC LIGHT ON THE RIGHT ===
+col_left, col_mid, col_right = st.columns([3,2,1])
+with col_left:
+    st.markdown(f"<div class='big-num'>{live_ratio}</div>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; color:#94a3b8; font-size:18px;'>9D/30D Ratio</p>", unsafe_allow_html=True)
+with col_mid:
+    st.markdown(f"<h2 style='text-align:center; color:#e2e8f0; margin-top:20px;'>{regime['zone']} REGIME</h2>", unsafe_allow_html=True)
+with col_right:
+    light = "Red" if live_ratio <= 0.84 else "Amber" if live_ratio <= 0.88 else "Green"
+    st.markdown(f"<div style='text-align:center; font-size:60px;'>{light}</div>", unsafe_allow_html=True)
 
-# === INPUTS & CALCS (unchanged from v5.6) ===
-col1, col2 = st.columns([1.1, 1.1])
-with col1:
-    st.markdown("<div class='glass'>", unsafe_allow_html=True)
-    st.markdown("### Core Edge")
+st.markdown("---")
+
+# === INPUTS ===
+c1, c2 = st.columns([1,1])
+with c1:
+    st.markdown("<div class='metric-card' style='border-left-color:#64748b'>", unsafe_allow_html=True)
+    st.subheader("Strategy Parameters")
     win_rate = st.slider("Win Rate (%)", 0.0, 100.0, 96.0, 0.1) / 100
-    base_winner = st.number_input("Base Avg Winner ($)", value=230, step=10)
-    avg_loser = st.number_input("Avg Loser ($)", value=-1206, step=50)
+    base_winner = st.number_input("Theoretical Winner ($)", value=230, step=5)
+    avg_loser = st.number_input("Average Loser ($)", value=-1206, step=25)
     commission = st.number_input("Commission RT ($)", value=1.3, step=0.1)
     st.markdown("</div>", unsafe_allow_html=True)
 
-with col2:
-    st.markdown("<div class='glass'>", unsafe_allow_html=True)
-    st.markdown("### Simulation")
-    start_bal = st.number_input("Account ($)", value=100000, step=50000)
-    num_trades = st.slider("Trades", 100, 5000, 1200)
-    num_paths = st.slider("Monte Carlo Paths", 50, 1000, 300)
-    max_contracts = st.number_input("Max Contracts (Cap)", value=10, min_value=1)
+with c2:
+    st.markdown("<div class='metric-card' style='border-left-color:#64748b'>", unsafe_allow_html=True)
+    st.subheader("Risk Controls")
+    start_bal = st.number_input("Starting Capital ($)", value=100000, step=25000)
+    max_contracts = st.number_input("Max Contracts per Trade", value=10, min_value=1)
+    num_trades = st.slider("Trades in Simulation", 250, 3000, 1200)
     st.markdown("</div>", unsafe_allow_html=True)
 
-net_win_base = base_winner - 2*commission
+# === CORE CALCULATIONS ===
+net_win = base_winner - 2*commission
 net_loss = avg_loser - 2*commission - 80
-effective_winner = net_win_base * (1 - shrinkage/100)
-edge = effective_winner / avg_debit
-kelly = max(0, min((win_rate * edge - (1-win_rate)) / edge if edge > 0 else 0, 0.5))
-growth = kelly * (win_rate * effective_winner + (1-win_rate) * net_loss) / avg_debit
-cagr = (1 + growth)**250 - 1
+effective_winner = net_win * (1 - shrinkage_pct/100)
+edge_per_dollar = effective_winner / avg_debit
+kelly_f = max(0.0, min(0.5, (win_rate * edge_per_dollar - (1-win_rate)) / edge_per_dollar if edge_per_dollar > 0 else 0))
+expected_growth = kelly_f * (win_rate * effective_winner + (1-win_rate) * net_loss) / avg_debit
+theoretical_cagr = (1 + expected_growth)**250 - 1
 
-c1,c2,c3,c4,c5 = st.columns(5)
-c1.metric("Debit", f"${avg_debit:,.0f}")
-c2.metric("Winner", f"${effective_winner:+.0f}")
-c3.metric("Edge/$", f"{edge:.3f}×")
-c4.metric("Kelly", f"{kelly:.1%}")
-c5.metric("CAGR", f"{cagr:.1%}")
+# === METRICS ROW ===
+m1, m2, m3, m4, m5, m6 = st.columns(6)
+m1.metric("Avg Debit", f"${avg_debit:,.0f}")
+m2.metric("Effective Winner", f"${effective_winner:+.0f}")
+m3.metric("Edge per $", f"{edge_per_dollar:.3f}×")
+m4.metric("Kelly Fraction", f"{kelly_f:.1%}")
+m5.metric("Theoretical CAGR", f"{theoretical_cagr:.1%}")
+m6.metric("Regime", regime["zone"])
 
-# Rest of simulation code (exactly same as v5.6 — black swan 1/100 ×2.5, clustering 50%) 
-# ... [same simulation block as previous message]
+# === SIMULATION (fully working) ===
+if st.button("RUN SIMULATION"):
+    with st.spinner("Running 500 Monte Carlo paths..."):
+        finals = []
+        paths = []
+        for _ in range(500):
+            bal = start_bal
+            path = [bal]
+            streak = 0
+            for _ in range(num_trades):
+                contracts = min(max_contracts, max(1, int(kelly_f * bal * 0.5 / avg_debit)))
+                p_win = win_rate * (0.60 if streak > 0 else 1.0)
+                won = np.random.random() < p_win
 
-if st.button("RUN GLOW SIMULATION", type="primary"):
-    # ← identical simulation code from v5.6 (not repeated here for brevity — just paste from previous version)
-    st.write("Simulation code unchanged — see v5.6 for full block")
+                # Black Swan: 1 in 100 trades, 2.5× loser
+                if np.random.random() < 0.01:
+                    pnl = net_loss * 2.5 * contracts
+                else:
+                    pnl = (effective_winner if won else net_loss) * contracts
 
-st.markdown("<p style='text-align:center;color:#64748b;margin-top:120px;'>v5.7 GLOW EDITION — FINAL AESTHETIC PERFECTION • 2025</p>", unsafe_allow_html=True)
+                # Loss clustering: 50% continuation probability
+                if not won and np.random.random() < 0.50:
+                    streak += 1
+                else:
+                    streak = 0
+
+                bal = max(bal + pnl, 1000)
+                path.append(bal)
+            finals.append(bal)
+            paths.append(path)
+
+        finals = np.array(finals)
+        paths = np.array(paths)
+        mean_path = np.mean(paths, axis=0)
+        sim_cagr = (finals / start_bal) ** (252 / num_trades) - 1
+
+        # Charts
+        col_chart, col_stats = st.columns([2.5,1])
+        with col_chart:
+            fig = go.Figure()
+            for p in paths[:100]:
+                fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1,color='rgba(100,149,237,0.15)'), showlegend=False))
+            fig.add_trace(go.Scatter(y=mean_path, mode='lines', line=dict(color='#60a5fa', width=5), name='Mean'))
+            fig.add_hline(y=start_bal, line_color="#e11d48", line_dash="dash")
+            fig.update_layout(template="plotly_dark", height=560, title="Equity Curve Distribution")
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col_stats:
+            st.metric("Median Terminal Wealth", f"${np.median(finals)/1e6:.2f}M")
+            st.metric("95th Percentile", f"${np.percentile(finals,95)/1e6:.2f}M")
+            st.metric("Mean CAGR", f"{np.mean(sim_cagr):.1%}")
+            st.metric("Ruin Probability", f"{(finals<10_000).mean():.2%}")
+
+st.markdown("<p style='text-align:center;color:#475569;margin-top:100px;font-size:14px;'>SPX Debit Put Diagonal Engine v6.0 — Production</p>", unsafe_allow_html=True)
