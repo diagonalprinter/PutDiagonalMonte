@@ -87,7 +87,9 @@ kelly_f = max(0.0, min(0.25, raw_kelly))          # 25% hard cap — no moon mat
 
 expected_growth = kelly_f * (win_rate * effective_winner + (1 - win_rate) * net_loss) / avg_debit
 years = max(0.1, num_trades / 150.0)
-theoretical_cagr = (1 + expected_growth) ** (150 / num_trades * 250 / 150) - 1 if num_trades > 0 else 0
+daily_growth = kelly_f * (win_rate * effective_winner + (1 - win_rate) * net_loss) / avg_debit
+theoretical_cagr = (1 + daily_growth) ** 250 - 1
+theoretical_cagr = max(theoretical_cagr, 0)   # prevent tiny negative rounding
 
 # === METRICS ===
 m1, m2, m3, m4, m5, m6 = st.columns(6)
