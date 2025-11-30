@@ -3,7 +3,7 @@ import numpy as np
 import plotly.graph_objects as go
 import requests
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.1", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.2", layout="wide")
 
 # === LIVE 9D/30D RATIO ===
 @st.cache_data(ttl=10)
@@ -18,7 +18,7 @@ def get_ratio():
 
 live_ratio, vix9d, vix30d = get_ratio()
 
-# === REGIME ===
+# === REGIME TABLE (your final spec) ===
 def get_regime(r):
     if r <= 0.84:   return {"debit":2650, "shrink":65, "zone":"OFF",           "color":"#dc2626"}
     if r <= 0.88:   return {"debit":2150, "shrink":25, "zone":"MARGINAL",      "color":"#f59e0b"}
@@ -31,7 +31,7 @@ regime = get_regime(live_ratio)
 avg_debit = regime["debit"] + np.random.normal(0, 70)
 shrinkage_pct = regime["shrink"]
 
-# === INSTITUTIONAL STYLE ===
+# === INSTITUTIONAL DESIGN ===
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -44,7 +44,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# === HEADER WITH SINGLE TRAFFIC LIGHT ON RIGHT ===
+# === HEADER — SINGLE TRAFFIC LIGHT ON RIGHT ===
 col_left, col_mid, col_right = st.columns([3,2,1])
 with col_left:
     st.markdown(f"<div class='big-num'>{live_ratio}</div>", unsafe_allow_html=True)
@@ -52,12 +52,13 @@ with col_left:
 with col_mid:
     st.markdown(f"<h2 style='text-align:center; color:#e2e8f0; margin-top:20px;'>{regime['zone']} REGIME</h2>", unsafe_allow_html=True)
 with col_right:
-    light = "Red" if live_ratio <= 0.84 else "Amber" if live_ratio <= 0.88 else "Green"
-    st.markdown(f"<div style='text-align:center; font-size:60px;'>{light}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='text-align:center; font-size:60px;'>
+                     {'Red' if live_ratio <= 0.84 else 'Amber' if live_ratio <= 0.88 else 'Green'}
+                 </div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
-# === INPUTS ===
+# === INPUTS INPUTS ===
 c1, c2 = st.columns([1,1])
 with c1:
     st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
@@ -73,34 +74,39 @@ with c2:
     st.subheader("Simulation Controls")
     start_bal = st.number_input("Starting Capital ($)", value=100000, step=25000)
     max_contracts = st.number_input("Max Contracts per Trade", value=10, min_value=1)
-    num_trades = st.slider("Total Trades in Simulation", 0, 3000, 150, 10)        # ← Your real pace
-    num_paths = st.slider("Monte Carlo Paths", 50, 1000, 300, 25)                 # ← Fully adjustable
+    num_trades = st.slider("Total Trades in Simulation", 0, 3000, 150, 10)      # your real ~150/year
+    num_paths = st.slider("Monte Carlo Paths", 50, 1000, 300, 25)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# === CALCULATIONS ===
-net_win = base_winner - 2*commission
-net_loss = avg_loser - 2*commission - 80
-effective_winner = net_win * (1 - shrinkage_pct/100)
+# === CORE CALCULATIONS (FIXED) ===
+net_win = base_winner - 2 * commission
+net_loss = avg_loser - 2 * commission - 80
+effective_winner = net_win * (1 - shrinkage_pct / 100)
 edge_per_dollar = effective_winner / avg_debit
-kelly_f = max(0.0, min(0.5, (win_rate * edge_per_dollar - (1-win_rate)) / edge_per_dollar if edge_per_dollar > 0 else 0))
-expected_growth = kelly_f * (win_rate * effective_winner + (1-win_rate) * net_loss) / avg_debit
-theoretical_cagr = (1 + expected_growth)**250 - 1 if num_trades > 0 else 0
 
-# === METRICS ===
+# Fixed Kelly with 25% hard cap (no more moon math)
+raw_kelly = (win_rate * edge_per_dollar - (1 - win_rate)) / edge_per_dollar if edge_per_dollar > 0 else 0
+kelly_f = max(0.0, min(0.25, raw_kelly))
+
+expected_growth = kelly_f * (win_rate * effective_winner + (1 - win_rate) * net_loss) / avg_debit
+years = num_trades / 150.0
+theoretical_cagr = (1 + expected_growth) ** (250 / 150 * 150 / num_trades if num_trades > 0 else 1) - 1
+
+# === METRICS ROW ===
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("Avg Debit", f"${avg_debit:,.0f}")
 m2.metric("Effective Winner", f"${effective_winner:+.0f}")
-m3.metric("Edge/$", f"{edge_per_dollar:.3f}×")
-m4.metric("Kelly", f"{kelly_f:.1%}")
+m3.metric("Edge per $", f"{edge_per_dollar:.3f}×")
+m4.metric("Kelly Fraction", f"{kelly_f:.1%}")
 m5.metric("Theoretical CAGR", f"{theoretical_cagr:.1%}")
 m6.metric("Regime", regime["zone"])
 
-# === SIMULATION (fully working) ===
+# === SIMULATION ===
 if st.button("RUN SIMULATION"):
     if num_trades == 0:
-        st.warning("Number of trades set to 0 — no simulation to run.")
+        st.info("Set number of trades > 0 to run simulation.")
     else:
-        with st.spinner(f"Running {num_paths} paths over {num_trades} trades..."):
+        with st.spinner(f"Running {num_paths:,} paths over {num_trades:,} trades..."):
             finals = []
             paths = []
             for _ in range(num_paths):
@@ -132,15 +138,16 @@ if st.button("RUN SIMULATION"):
             finals = np.array(finals)
             paths = np.array(paths)
             mean_path = np.mean(paths, axis=0)
-            years = num_trades / 150  # your real annual trade rate
-            sim_cagr = (finals / start_bal) ** (1/years) - 1 if years > 0 else 0
+            years_sim = num_trades / 150
+            sim_cagr = (finals / start_bal) ** (1 / years_sim) - 1 if years_sim > 0 else 0
 
+            # Charts
             col_chart, col_stats = st.columns([2.5,1])
             with col_chart:
                 fig = go.Figure()
                 for p in paths[:100]:
-                    fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1,color='rgba(100,149,237,0.15)'), showlegend=False))
-                fig.add_trace(go.Scatter(y=mean_path, mode='lines', line=dict(color='#60a5fa', width=5), name='Mean'))
+                    fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1, color='rgba(100,149,237,0.15)'), showlegend=False))
+                fig.add_trace(go.Scatter(y=mean_path, mode='lines', line=dict(color='#60a5fa', width=5), name='Mean Path'))
                 fig.add_hline(y=start_bal, line_color="#e11d48", line_dash="dash")
                 fig.update_layout(template="plotly_dark", height=560, title="Equity Curve Distribution")
                 st.plotly_chart(fig, use_container_width=True)
@@ -151,4 +158,4 @@ if st.button("RUN SIMULATION"):
                 st.metric("Mean CAGR", f"{np.mean(sim_cagr):.1%}")
                 st.metric("Ruin Probability", f"{(finals<10_000).mean():.2%}")
 
-st.markdown("<p style='text-align:center;color:#475569;margin-top:100px;font-size:14px;'>SPX Debit Put Diagonal Engine v6.1 — Production • 2025</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;color:#475569;margin-top:100px;font-size:14px;'>SPX Debit Put Diagonal Engine v6.2 — Production • 2025</p>", unsafe_allow_html=True)
