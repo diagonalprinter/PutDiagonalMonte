@@ -18,7 +18,7 @@ def get_ratio():
 
 live_ratio, vix9d, vix30d = get_ratio()
 
-# === REGIME TABLE (your final spec) ===
+# === REGIME TABLE ===
 def get_regime(r):
     if r <= 0.84:   return {"debit":2650, "shrink":65, "zone":"OFF",           "color":"#dc2626"}
     if r <= 0.88:   return {"debit":2150, "shrink":25, "zone":"MARGINAL",      "color":"#f59e0b"}
@@ -31,35 +31,33 @@ regime = get_regime(live_ratio)
 avg_debit = regime["debit"] + np.random.normal(0, 70)
 shrinkage_pct = regime["shrink"]
 
-# === INSTITUTIONAL DESIGN ===
+# === STYLE ===
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     html, body, .stApp {background:#0b1120; font-family:'Inter',sans-serif; color:#e2e8f0;}
     .big-num {font-size:84px; font-weight:700; text-align:center; color:#ffffff; margin:30px 0 10px 0;}
-    .header-bar {background:#1e293b; padding:20px; border-radius:12px; margin-bottom:30px;}
     .metric-card {background:#1e293b; padding:20px; border-radius:10px; border-left:4px solid #64748b;}
     .stButton>button {background:#334155; color:white; border:none; border-radius:8px; height:52px; font-size:16px; font-weight:600;}
     .stButton>button:hover {background:#475569;}
 </style>
 """, unsafe_allow_html=True)
 
-# === HEADER — SINGLE TRAFFIC LIGHT ON RIGHT ===
-col_left, col_mid, col_right = st.columns([3,2,1])
+# === HEADER — SINGLE TRAFFIC LIGHT ON RIGHT (fixed syntax) ===
+col_left, col_mid, col_right = st.columns([3, 2, 1])
 with col_left:
     st.markdown(f"<div class='big-num'>{live_ratio}</div>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center; color:#94a3b8; font-size:18px;'>9D/30D Ratio</p>", unsafe_allow_html=True)
 with col_mid:
     st.markdown(f"<h2 style='text-align:center; color:#e2e8f0; margin-top:20px;'>{regime['zone']} REGIME</h2>", unsafe_allow_html=True)
 with col_right:
-    st.markdown(f"<div style='text-align:center; font-size:60px;'>
-                     {'Red' if live_ratio <= 0.84 else 'Amber' if live_ratio <= 0.88 else 'Green'}
-                 </div>", unsafe_allow_html=True)
+    light = "Red" if live_ratio <= 0.84 else "Amber" if live_ratio <= 0.88 else "Green"
+    st.markdown(f"<div style='text-align:center; font-size:60px;'>{light}</div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
-# === INPUTS INPUTS ===
-c1, c2 = st.columns([1,1])
+# === INPUTS ===
+c1, c2 = st.columns([1, 1])
 with c1:
     st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
     st.subheader("Strategy Parameters")
@@ -74,29 +72,28 @@ with c2:
     st.subheader("Simulation Controls")
     start_bal = st.number_input("Starting Capital ($)", value=100000, step=25000)
     max_contracts = st.number_input("Max Contracts per Trade", value=10, min_value=1)
-    num_trades = st.slider("Total Trades in Simulation", 0, 3000, 150, 10)      # your real ~150/year
+    num_trades = st.slider("Total Trades in Simulation", 0, 3000, 150, 10)
     num_paths = st.slider("Monte Carlo Paths", 50, 1000, 300, 25)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# === CORE CALCULATIONS (FIXED) ===
+# === FIXED CALCULATIONS ===
 net_win = base_winner - 2 * commission
 net_loss = avg_loser - 2 * commission - 80
 effective_winner = net_win * (1 - shrinkage_pct / 100)
 edge_per_dollar = effective_winner / avg_debit
 
-# Fixed Kelly with 25% hard cap (no more moon math)
 raw_kelly = (win_rate * edge_per_dollar - (1 - win_rate)) / edge_per_dollar if edge_per_dollar > 0 else 0
-kelly_f = max(0.0, min(0.25, raw_kelly))
+kelly_f = max(0.0, min(0.25, raw_kelly))          # 25% hard cap — no moon math
 
 expected_growth = kelly_f * (win_rate * effective_winner + (1 - win_rate) * net_loss) / avg_debit
-years = num_trades / 150.0
-theoretical_cagr = (1 + expected_growth) ** (250 / 150 * 150 / num_trades if num_trades > 0 else 1) - 1
+years = max(0.1, num_trades / 150.0)
+theoretical_cagr = (1 + expected_growth) ** (150 / num_trades * 250 / 150) - 1 if num_trades > 0 else 0
 
-# === METRICS ROW ===
+# === METRICS ===
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("Avg Debit", f"${avg_debit:,.0f}")
 m2.metric("Effective Winner", f"${effective_winner:+.0f}")
-m3.metric("Edge per $", f"{edge_per_dollar:.3f}×")
+m3.metric("Edge/$", f"{edge_per_dollar:.3f}×")
 m4.metric("Kelly Fraction", f"{kelly_f:.1%}")
 m5.metric("Theoretical CAGR", f"{theoretical_cagr:.1%}")
 m6.metric("Regime", regime["zone"])
@@ -118,14 +115,12 @@ if st.button("RUN SIMULATION"):
                     p_win = win_rate * (0.60 if streak > 0 else 1.0)
                     won = np.random.random() < p_win
 
-                    # Black Swan: 1 in 100 trades, 2.5× loser
-                    if np.random.random() < 0.01:
+                    if np.random.random() < 0.01:                     # Black Swan 1 in 100
                         pnl = net_loss * 2.5 * contracts
                     else:
                         pnl = (effective_winner if won else net_loss) * contracts
 
-                    # Loss clustering: 50% continuation
-                    if not won and np.random.random() < 0.50:
+                    if not won and np.random.random() < 0.50:         # 50% clustering
                         streak += 1
                     else:
                         streak = 0
@@ -138,11 +133,10 @@ if st.button("RUN SIMULATION"):
             finals = np.array(finals)
             paths = np.array(paths)
             mean_path = np.mean(paths, axis=0)
-            years_sim = num_trades / 150
+            years_sim = num_trades / 150.0
             sim_cagr = (finals / start_bal) ** (1 / years_sim) - 1 if years_sim > 0 else 0
 
-            # Charts
-            col_chart, col_stats = st.columns([2.5,1])
+            col_chart, col_stats = st.columns([2.5, 1])
             with col_chart:
                 fig = go.Figure()
                 for p in paths[:100]:
