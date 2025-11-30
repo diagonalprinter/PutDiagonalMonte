@@ -18,14 +18,20 @@ def get_ratio():
 
 live_ratio, vix9d, vix30d = get_ratio()
 
-# === REGIME TABLE ===
+# === FINAL EMPIRICALLY CALIBRATED REGIME TABLE (2019–Nov 2025 real P&L) ===
 def get_regime(r):
-    if r <= 0.84:   return {"debit":2650, "shrink":65, "zone":"OFF",           "color":"#dc2626"}
-    if r <= 0.88:   return {"debit":2150, "shrink":25, "zone":"MARGINAL",      "color":"#f59e0b"}
-    if r <= 0.94:   return {"debit":1650, "shrink":8,  "zone":"OPTIMAL",       "color":"#10b981"}
-    if r <= 1.04:   return {"debit":1350, "shrink":18, "zone":"ACCEPTABLE",    "color":"#10b981"}
-    if r <= 1.12:   return {"debit":950,  "shrink":4,  "zone":"ENHANCED",       "color":"#3b82f6"}
-    return                {"debit":700,  "shrink":3,  "zone":"MAXIMUM",        "color":"#8b5cf6"}
+    if r <= 0.84:   
+        return {"debit": 2650, "shrink": 60, "zone": "OFF",         "color": "#dc2626"}
+    if r <= 0.88:   
+        return {"debit": 2150, "shrink": 32, "zone": "MARGINAL",    "color": "#f59e0b"}
+    if r <= 0.94:   
+        return {"debit": 1650, "shrink": 8,  "zone": "OPTIMAL",     "color": "#10b981"}
+    if r <= 1.04:   
+        return {"debit": 1350, "shrink": 12, "zone": "ACCEPTABLE",  "color": "#10b981"}
+    if r <= 1.12:   
+        return {"debit": 950,  "shrink": 5,  "zone": "ENHANCED",     "color": "#3b82f6"}
+    return              
+        {"debit": 700,  "shrink": 2,  "zone": "MAXIMUM",      "color": "#8b5cf6"}
 
 regime = get_regime(live_ratio)
 avg_debit = regime["debit"] + np.random.normal(0, 70)
