@@ -1,26 +1,24 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
-import yfinance as yf
+import yfinance as yf  # Requires requirements.txt entry
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.6 — LIVE DEBIT", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.6", layout="wide")
 
-# === LIVE SPX OPTIONS DATA ===
-@st.cache_data(ttl=30)  # Refresh every 30 seconds
+# === LIVE DEBIT CALC ===
+@st.cache_data(ttl=30)
 def get_live_debit():
     try:
-        # Get current SPX price
         spx = yf.Ticker("^GSPC")
         current_spx = spx.history(period="1d")['Close'].iloc[-1]
         
-        # Find expirations ~8DTE and ~16DTE
+        # Find ~8DTE and ~16DTE expirations
         today = datetime.now()
         exp8 = today + timedelta(days=8)
         exp16 = today + timedelta(days=16)
         opts = spx.options
         
-        # Closest expirations
         exp8_str = min(opts, key=lambda x: abs(datetime.strptime(x, '%Y-%m-%d') - exp8))
         exp16_str = min(opts, key=lambda x: abs(datetime.strptime(x, '%Y-%m-%d') - exp16))
         
@@ -28,34 +26,36 @@ def get_live_debit():
         puts8 = spx.option_chain(exp8_str).puts
         puts16 = spx.option_chain(exp16_str).puts
         
-        # Short strike: 0.25% OTM
+        # Your exact strikes: short 0.25% OTM, long 20 wide
         short_strike = current_spx * (1 - 0.0025)
-        long_strike = short_strike - 20  # 20 wide
+        long_strike = short_strike - 20
         
-        # Closest puts (mid price)
-        short_put = puts8.iloc[(puts8['strike'] - short_strike).abs().argsort()[:1]]
-        long_put = puts16.iloc[(puts16['strike'] - long_strike).abs().argsort()[:1]]
+        # Closest puts (last price for reliability)
+        short_row = puts8.iloc[(puts8['strike'] - short_strike).abs().argsort()[:1]]
+        long_row = puts16.iloc[(puts16['strike'] - long_strike).abs().argsort()[:1]]
         
-        short_premium = short_put['lastPrice'].values[0]
-        long_premium = long_put['lastPrice'].values[0]
-        debit = short_premium - long_premium
+        short_premium = short_row['lastPrice'].values[0]
+        long_premium = long_row['lastPrice'].values[0]
+        debit_per_share = max(0.50, short_premium - long_premium)
+        debit = debit_per_share * 100  # SPX multiplier
         
         return {
             "current_spx": current_spx,
-            "short_strike": short_strike,
-            "long_strike": long_strike,
+            "short_strike": round(short_strike),
+            "long_strike": round(long_strike),
             "short_premium": short_premium,
             "long_premium": long_premium,
-            "debit": max(0, debit)  # Ensure non-negative
+            "debit": debit
         }
-    except:
+    except Exception as e:
+        st.error(f"Live data error: {e}. Using fallback.")
         return {
             "current_spx": 6000,
             "short_strike": 5985,
             "long_strike": 5965,
-            "short_premium": 12.50,
-            "long_premium": 11.20,
-            "debit": 1.30
+            "short_premium": 12.5,
+            "long_premium": 11.2,
+            "debit": 130.0  # $1.30 per share × 100 = $130
         }
 
 live_data = get_live_debit()
@@ -78,9 +78,9 @@ col1, col2, col3 = st.columns([1, 2, 1])
 with col1:
     st.metric("SPX Price", f"${live_data['current_spx']:.0f}")
 with col2:
-    st.markdown(f"<h2 style='text-align:center; color:#e2e8f0;'>{live_data['debit']:.2f} DEBIT</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 style='text-align:center; color:#e2e8f0;'>{live_data['debit']:.0f} DEBIT</h2>", unsafe_allow_html=True)
 with col3:
-    st.markdown(f"<h2 style='text-align:center; color:#e2e8f0;'>Short: {live_data['short_strike']:.0f}P | Long: {live_data['long_strike']:.0f}P</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 style='text-align:center; color:#e2e8f0;'>Short: {live_data['short_strike']}P | Long: {live_data['long_strike']}P</h2>", unsafe_allow_html=True)
 
 # === INPUTS ===
 c1, c2 = st.columns([1,1])
@@ -103,10 +103,10 @@ with c2:
     st.markdown("</div>", unsafe_allow_html=True)
 
 # === CALCULATIONS (using live debit) ===
-debit = live_data['debit'] * 100  # yfinance gives per share, multiply by 100 for SPX
+debit = live_data['debit']
 net_win = base_winner - 2 * commission
 net_loss = avg_loser - 2 * commission - 80
-effective_winner = net_win * (1 - 0.12)  # Default shrinkage — adjust based on live data if needed
+effective_winner = net_win * 0.88  # Default shrinkage — adjust based on live data if needed
 edge_per_dollar = effective_winner / debit
 raw_kelly = (win_rate * edge_per_dollar - (1 - win_rate)) / edge_per_dollar if edge_per_dollar > 0 else 0
 kelly_f = max(0.0, min(0.25, raw_kelly))
@@ -122,7 +122,7 @@ m4.metric("Kelly Fraction", f"{kelly_f:.1%}")
 m5.metric("Theoretical CAGR", f"{theoretical_cagr:.1%}")
 m6.metric("Regime", "LIVE")
 
-# === SIMULATION (full, working) ===
+# === SIMULATION ===
 if st.button("RUN SIMULATION"):
     if num_trades == 0:
         st.info("Set number of trades > 0 to run simulation.")
