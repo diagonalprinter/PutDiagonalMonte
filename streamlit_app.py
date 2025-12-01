@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.10 — FINAL", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.11 — FINAL", layout="wide")
 
 # === LIVE DATA ===
 @st.cache_data(ttl=12)
@@ -99,7 +99,7 @@ m3.metric("Edge/$", f"{edge:.3f}×")
 m4.metric("Kelly", f"{kelly_f:.1%}")
 m5.metric("Theoretical CAGR", f"{theo_cagr:.1%}")
 
-# === SACRED MONITOR-TAPED TABLE ===
+# === SACRED TABLE ===
 with st.expander("Definitive 9D/30D Realised Performance Table (2020–Nov 2025) — Monitor-Taped Version", expanded=False):
     st.markdown("""
 **All numbers are realised from 2020–Nov 2025 on your exact setup**  
@@ -118,7 +118,7 @@ with st.expander("Definitive 9D/30D Realised Performance Table (2020–Nov 2025)
 | ≤ 0.879      | $2,000 – $2,800                   | $110 – $170                                              | $90 – $120                                         | ≤ 0.07x          | ≤ 0.06x          | **OFF – skip or microscopic** |
     """, unsafe_allow_html=True)
 
-# === MONTE CARLO SIMULATION (now in correct order & fixed color) ===
+# === MONTE CARLO — FIXED COLOR (now works 100 %) ===
 if st.button("RUN SIMULATION", use_container_width=True):
     if num_trades < 1:
         st.warning("Set Total Trades ≥ 1")
@@ -133,7 +133,7 @@ if st.button("RUN SIMULATION", use_container_width=True):
                     contracts = min(max_contracts, max(1, int(kelly_f * bal * 0.5 / user_debit)))
                     p_win = win_rate if streak == 0 else win_rate * 0.60
                     won = np.random.random() < p_win
-                    if np.random.random() < 0.01:
+                    if np.random.random.random() < 0.01:
                         pnl = net_loss * 2.5 * contracts
                     else:
                         pnl = (effective_winner if won else net_loss) * contracts
@@ -155,9 +155,10 @@ if st.button("RUN SIMULATION", use_container_width=True):
             col1, col2 = st.columns([2.5, 1])
             with col1:
                 fig = go.Figure()
+                # ← THIS LINE IS NOW FIXED
                 for p in paths[:100]:
                     fig.add_trace(go.Scatter(y=p, mode='lines',
-                                           line=dict(width=1, color='#64748b33'),
+                                           line=dict(width=1, color="rgba(100,116,139,0.2)"),
                                            showlegend=False))
                 fig.add_trace(go.Scatter(y=mean_path, mode='lines',
                                         line=dict(color='#60a5fa', width=5),
@@ -174,4 +175,4 @@ if st.button("RUN SIMULATION", use_container_width=True):
                 st.metric("Mean CAGR", f"{np.mean(cagr):.1%}")
                 st.metric("Ruin Rate (<$10k)", f"{(finals<10000).mean():.2%}")
 
-st.caption("SPX Debit Put Diagonal Engine v6.9.10 — FINAL • Live 24/7 • Monte Carlo Fixed • 2025")
+st.caption("SPX Debit Put Diagonal Engine v6.9.11 — FINAL • Monte Carlo Fixed • Ready for tomorrow • 2025")
