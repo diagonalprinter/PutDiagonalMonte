@@ -4,9 +4,9 @@ import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.7 — FINAL", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.8 — FINAL FOREVER", layout="wide")
 
-# === LIVE DATA FROM YAHOO (24/7) ===
+# === LIVE DATA (yfinance = true 24/7) ===
 @st.cache_data(ttl=12)
 def get_market_data():
     try:
@@ -83,10 +83,41 @@ with c5:
 
 st.markdown("---")
 
-# === INPUTS & CALCS (unchanged) ===
-# ... (same as previous working version — omitted for brevity but fully included)
+# === INPUTS ===
+left, right = st.columns(2)
+with left:
+    st.subheader("Strategy Parameters")
+    user_debit = st.number_input("Current Debit ($)", 100, 5000, 1350, 10)
+    win_rate = st.slider("Win Rate (%)", 80.0, 99.9, 96.0, 0.1) / 100
+    base_winner = st.number_input("Theoretical Winner ($)", value=230, step=5)
+    avg_loser = st.number_input("Average Loser ($)", value=-1206, step=25)
+    commission = st.number_input("Commission RT ($)", value=1.3, step=0.1)
 
-# === THE ONE AND ONLY DEFINITIVE NO-FLUFF TABLE ===
+with right:
+    st.subheader("Simulation Controls")
+    start_bal = st.number_input("Starting Capital ($)", value=100000, step=25000)
+    max_contracts = st.number_input("Max Contracts", value=10, min_value=1)
+    num_trades = st.slider("Total Trades", 10, 3000, 150, 10)
+    num_paths = st.slider("Monte Carlo Paths", 50, 1000, 300, 25)
+
+# === CALCULATIONS ===
+net_win = base_winner - 2 * commission
+net_loss = avg_loser - 2 * commission - 80
+effective_winner = net_win * (1 - regime["shrink"]/100)
+edge = effective_winner / user_debit
+raw_kelly = (win_rate * edge - (1-win_rate)) / edge if edge > 0 else 0
+kelly_f = max(0.0, min(0.25, raw_kelly))
+daily_growth = kelly_f * (win_rate * effective_winner + (1-win_rate) * net_loss) / user_debit
+theo_cagr = (1 + daily_growth)**250 - 1
+
+m1, m2, m3, m4, m5 = st.columns(5)
+m1.metric("Debit", f"${user_debit:,}")
+m2.metric("Effective Winner", f"${effective_winner:+.0f}")
+m3.metric("Edge/$", f"{edge:.3f}×")
+m4.metric("Kelly", f"{kelly_f:.1%}")
+m5.metric("Theoretical CAGR", f"{theo_cagr:.1%}")
+
+# === YOUR SACRED MONITOR-TAPED TABLE — EXACTLY AS IT WAS ===
 with st.expander("Definitive 9D/30D Realised Performance Table (2020–Nov 2025) — Monitor-Taped Version", expanded=False):
     st.markdown("""
 **All numbers are realised from 2020–Nov 2025 on your exact setup**  
@@ -105,7 +136,59 @@ with st.expander("Definitive 9D/30D Realised Performance Table (2020–Nov 2025)
 | ≤ 0.879      | $2,000 – $2,800                   | $110 – $170                                              | $90 – $120                                         | ≤ 0.07x          | ≤ 0.06x          | **OFF – skip or microscopic** |
     """, unsafe_allow_html=True)
 
-# === REST OF APP (unchanged, perfect) ===
-# (all inputs, metrics, simulation — exactly as before)
+# === FULL MONTE CARLO SIMULATION (exactly as before) ===
+if st.button("RUN SIMULATION", use_container_width=True):
+    if num_trades < 1:
+        st.warning("Set Total Trades ≥ 1")
+    else:
+        with st.spinner(f"Running {num_paths:,} paths × {num_trades:,} trades..."):
+            finals, paths = [], []
+            for _ in range(num_paths):
+                bal = start_bal
+                path = [bal]
+                streak = 0
+                for _ in range(num_trades):
+                    contracts = min(max_contracts, max(1, int(kelly_f * bal * 0.5 / user_debit)))
+                    p_win = win_rate if streak == 0 else win_rate * 0.60
+                    won = np.random.random() < p_win
 
-st.caption("SPX Debit Put Diagonal Engine v6.9.7 — FINAL PRODUCTION • Live 24/7 • The One You Tape To Your Monitor • 2025")
+                    # Black swan 1-in-100
+                    if np.random.random() < 0.01:
+                        pnl = net_loss * 2.5 * contracts
+                    else:
+                        pnl = (effective_winner if won else net_loss) * contracts
+
+                    # Loss clustering
+                    if not won and np.random.random() < 0.50:
+                        streak += 1
+                    else:
+                        streak = 0
+
+                    bal = max(bal + pnl, 1000)
+                    path.append(bal)
+                finals.append(bal)
+                paths.append(path)
+
+            finals = np.array(finals)
+            paths = np.array(paths)
+            mean_path = np.mean(paths, axis=0)
+            years = num_trades / 150.0
+            cagr = (finals / start_bal) ** (1/years) - 1 if years > 0 else 0
+
+            col1, col2 = st.columns([2.5, 1])
+            with col1:
+                fig = go.Figure()
+                for p in paths[:100]:
+                    fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1, color='#64748b33'), showlegend=False))
+                fig.add_trace(go.Scatter(y=mean_path, mode='lines', line=dict(color='#60a5fa', width=5), name='Mean Path'))
+                fig.add_hline(y=start_bal, line_color="#e11d48", line_dash="dash", annotation_text="Starting Capital")
+                fig.update_layout(template="plotly_dark", height=560, title="Monte Carlo Equity Curves")
+                st.plotly_chart(fig, use_container_width=True)
+
+            with col2:
+                st.metric("Median Final Balance", f"${np.median(finals)/1e6:.2f}M")
+                st.metric("95th Percentile", f"${np.percentile(finals,95)/1e6:.2f}M")
+                st.metric("Mean CAGR", f"{np.mean(cagr):.1%}")
+                st.metric("Ruin Rate (<$10k)", f"{(finals<10000).mean():.2%}")
+
+st.caption("SPX Debit Put Diagonal Engine v6.9.8 — FINAL FOREVER • Live 24/7 • Your Monitor-Taped Table • Full Monte Carlo • 2025")
