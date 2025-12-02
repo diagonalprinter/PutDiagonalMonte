@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.20 ", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.20 — TROPHY EDITION", layout="wide")
 
 # === LIVE DATA ===
 @st.cache_data(ttl=12)
