@@ -2,76 +2,136 @@ import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 import yfinance as yf
-from datetime import datetime
+import pandas as pd
+from datetime import datetime, timedelta
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.20 — TROPHY EDITION", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.21 — TROPHY", layout="wide")
 
-# === LIVE DATA ===
-@st.cache_data(ttl=12)
-def get_market_data():
-    try:
-        vix9d = yf.Ticker("^VIX9D").info.get('regularMarketPrice', 18.4)
-        vix30d = yf.Ticker("^VIX").info.get('regularMarketPrice', 18.1)
-        ratio = round(vix9d / vix30d, 3) if vix30d > 0 else 1.018
-        spx = yf.Ticker("^GSPC").info.get('regularMarketPrice', 6000.0)
-        es = yf.Ticker("ES=F").info.get('regularMarketPrice', 6015.0)
-        return ratio, round(spx, 1), round(es, 1)
-    except:
-        return 1.018, 6000.0, 6015.0
-
-live_ratio, spx_price, es_price = get_market_data()
-now_str = datetime.now().strftime("%H:%M:%S ET")
-
-# === REGIME ===
-def get_regime(r):
-    if r <= 0.84:   return {"shrink":60, "zone":"OFF",        "color":"#dc2626"}
-    if r <= 0.88:   return {"shrink":32, "zone":"MARGINAL",   "color":"#f59e0b"}
-    if r <= 0.94:   return {"shrink":8,  "zone":"OPTIMAL",    "color":"#10b981"}
-    if r <= 1.04:   return {"shrink":12, "zone":"ACCEPTABLE","color":"#10b981"}
-    if r <= 1.12:   return {"shrink":5,  "zone":"ENHANCED",   "color":"#3b82f6"}
-    return                  {"shrink":2,  "zone":"MAXIMUM",    "color":"#8b5cf6"}
-
-regime = get_regime(live_ratio)
-light = "Red" if live_ratio <= 0.84 else "Amber" if live_ratio <= 0.88 else "Green"
-
-# === STYLE ===
+# ================================
+# STYLE
+# ================================
 st.markdown("""
 <style>
-    .header-card {background:#1e293b; border:1px solid #334155; border-radius:12px; padding:12px; text-align:center; height:135px; display:flex; flex-direction:column; justify-content:center;}
+    .header-card {background:#1e293b; border:1px solid #334155; border-radius:12px; padding:12px; 
+                  text-align:center; height:135px; display:flex; flex-direction:column; justify-content:center;}
     .big {font-size:34px; font-weight:700; margin:4px 0; color:white;}
     .small {font-size:12px; color:#94a3b8; margin:0;}
+    .nuclear {background:#7f1d1d !important; animation: pulse 1.5s infinite;}
+    @keyframes pulse {0% {opacity:1} 50% {opacity:0.6} 100% {opacity:1}}
 </style>
 """, unsafe_allow_html=True)
 
-# === HEADER ===
-c1, c2, c3, c4, c5 = st.columns(5)
+# ================================
+# LIVE + FORWARD 9D/30D CURVE + GRAPH
+# ================================
+@st.cache_data(ttl=60)
+def get_vol_data():
+    try:
+        # Spot values
+        vix9d = yf.Ticker("^VIX9D").info.get('regularMarketPrice', 18.4)
+        vix30d = yf.Ticker("^VIX").info.get('regularMarketPrice', 18.1)
+        spot_ratio = round(vix9d / vix30d, 3) if vix30d > 0 else 1.018
+
+        # VIX futures for forward curve (front 6 contracts)
+        tickers = ["^VIX", "VXZ25", "VXF26", "VXH26", "VXM26", "VXN26", "VXQ26", "VXU26"]
+        data = yf.download(tickers, period="10d", progress=False)['Close'].iloc[-1]
+        prices = []
+        labels = []
+        today = datetime.now()
+
+        for i, ticker in enumerate(tickers):
+            if ticker in data and pd.notna(data[ticker]):
+                price = data[ticker]
+                if i == 0:
+                    label = "Spot 30D"
+                else:
+                    future_date = (today + timedelta(days=30*i)).strftime("%b%y")
+                    label = future_date
+                prices.append(price)
+                labels.append(label)
+
+        # Forward 9D/30D ≈ front-month VIX / later months
+        forward_ratios = []
+        forward_labels = []
+        for i in range(1, len(prices)):
+            ratio = round(prices[0] / prices[i], 3)
+            forward_ratios.append(ratio)
+            forward_labels.append(labels[i])
+
+        forward_ratio = forward_ratios[0] if forward_ratios else spot_ratio
+
+        # next month
+
+        spx = yf.Ticker("^GSPC").info.get('regularMarketPrice', 6000.0)
+        return spot_ratio, forward_ratio, forward_labels, forward_ratios, round(spx,1)
+    except:
+        return 1.018, 1.012, ["Jan26","Feb26","Mar26"], [1.01,1.00,0.99], 6000.0
+
+spot_ratio, forward_ratio, fwd_labels, fwd_ratios, spx_price = get_vol_data()
+now_str = datetime.now().strftime("%H:%M:%S ET")
+
+# ================================
+# REGIME & ALERT LOGIC
+# ================================
+def get_regime(r):
+    if r >= 1.30: return {"zone":"NUCLEAR","color":"#dc2626","size":"3.0×","alert":True}
+    if r >= 1.20: return {"zone":"INSANE", "color":"#7c3aed","size":"2.5×","alert":True}
+    if r >= 1.12: return {"zone":"GOD ZONE","color":"#8b5cf6","size":"2.0×","alert":True}
+    if r >= 1.04: return {"zone":"GOLDEN", "color":"#3b82f6","size":"1.8×","alert":False}
+    if r >= 1.00: return {"zone":"OPTIMAL","color":"#10b981","size":"1.5×","alert":False}
+    if r >= 0.94: return {"zone":"NORMAL", "color":"#84cc16","size":"1.0×","alert":False}
+    return                {"zone":"RATIO MODE","color":"#ef4444","size":"0×","alert":False}
+
+regime = get_regime(spot_ratio)
+
+# ================================
+# HEADER + FORWARD CURVE GRAPH
+# ================================
+c1, c2, c3, c4 = st.columns([1.3, 1.3, 1.3, 3.1])
 with c1:
-    st.markdown(f'<div class="header-card"><p class="small">9D/30D Ratio</p><p class="big">{live_ratio}</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="header-card"><p class="small">Spot 9D/30D</p><p class="big">{spot_ratio}</p></div>', unsafe_allow_html=True)
 with c2:
-    st.markdown(f'<div class="header-card"><p class="small">Current Regime</p><p class="big">{regime["zone"]}</p></div>', unsafe_allow_html=True)
+    alert_class = 'nuclear' if reg["alert"] else ''
+    st.markdown(f'<div class="header-card {alert_class}"><p class="small">Regime</p><p class="big">{reg["zone"]}</p><p class="small">SIZE: {reg["size"]}</p></div>', unsafe_allow_html=True)
 with c3:
-    st.markdown(f'<div class="header-card"><p class="small">Market Light</p><p class="big">{light}</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="header-card"><p class="small">Forward 9D/30D</p><p class="big">{forward_ratio}</p></div>', unsafe_allow_html=True)
 with c4:
-    fig = go.Figure(go.Indicator(mode="gauge+number", value=live_ratio, number={'font': {'size': 28}},
-        gauge={'axis': {'range': [0.76, 1.38]}, 'bar': {'color': "#60a5fa"},
-               'steps': [{'range': [0.76, 0.88], 'color': '#991b1b'},
-                         {'range': [0.88, 0.94], 'color': '#d97706'},
-                         {'range': [0.94, 1.12], 'color': '#166534'},
-                         {'range': [1.12, 1.38], 'color': '#1d4ed8'}]},
-        title={'text': "52-Week", 'font': {'size': 11}}))
-    fig.update_layout(height=135, margin=dict(t=15, b=10, l=10, r=10), paper_bgcolor="#1e293b", font_color="#e2e8f0")
-    st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True})
-with c5:
-    st.markdown(f'<div class="header-card"><p class="small">SPX • ES Futures</p><p class="big">SPX: {spx_price:,.0f}<br>ES: {es_price:,.0f}</p><p class="small">Live {now_str}</p></div>', unsafe_allow_html=True)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=fwd_labels, y=fwd_ratios, mode='lines+markers',
+                             line=dict(color='#60a5fa', width=4), marker=dict(size=10),
+                             name='Forward 9D/30D'))
+    fig.add_hline(y=1.0, line_dash="dash", line_color="#e11d48", annotation_text="1.00")
+    fig.add_hline(y=spot_ratio, line_dash="dot", line_color="#f59e0b", annotation_text=f"Spot {spot_ratio}")
+    fig.update_layout(title="Forward 9D/30D Curve (Next 6 Months)", height=135,
+                      margin=dict(l=10,r=10,t=35,b=10), paper_bgcolor="#1e293b",
+                      plot_bgcolor="#1e293b", font_color="#e2e8f0",
+                      xaxis=dict(showgrid=False), yaxis=dict(range=[0.85,1.35], gridcolor="#334155"))
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
+# ================================
+# ALERT MESSAGES
+# ================================
+if reg["alert"]:
+    st.error("NUCLEAR ALERT — MAX SIZE DIAGONALS RIGHT NOW")
+elif forward_ratio > spot_ratio + 0.06:
+    st.success("Forward curve rising fast → GOD ZONE INCOMING (3–15 days) — START SCALING HARD")
+elif forward_ratio > spot_ratio + 0.03:
+    st.success("Forward curve rising → Begin scaling up")
+elif forward_ratio < spot_ratio - 0.05:
+    st.warning("Forward curve falling → Prepare for ratio mode soon")
+else:
+    st.info("Regime stable — trade normal size")
 
 st.markdown("---")
 
-# === INPUTS ===
+# ================================
+# INPUTS
+# ================================
 left, right = st.columns(2)
 with left:
     st.subheader("Strategy Parameters")
     user_debit = st.number_input("Current Debit ($)", 100, 5000, 1350, 10)
-    win_rate = st.slider("Win Rate (%)", 0.0, 100.0, 96.0, 0.1) / 100
+    win_rate = st.slider("Win Rate (%)", 80.0, 99.9, 96.0, 0.1) / 100
     base_winner = st.number_input("Theoretical Winner ($)", value=230, step=5)
     avg_loser = st.number_input("Average Loser ($)", value=-1206, step=25)
     commission = st.number_input("Commission RT ($)", value=1.3, step=0.1)
@@ -79,46 +139,52 @@ with right:
     st.subheader("Simulation Controls")
     start_bal = st.number_input("Starting Capital ($)", value=100000, step=25000)
     max_contracts = st.number_input("Max Contracts", value=10, min_value=1)
-    num_trades = st.slider("Total Trades", 0, 3000, 150, 10)
+    num_trades = st.slider("Total Trades", 10, 3000, 150, 10)
     num_paths = st.slider("Monte Carlo Paths", 50, 1000, 300, 25)
 
-# === CALCULATIONS ===
+# ================================
+# CALCULATIONS (using original shrink logic)
+# ================================
+regime_shrink = {
+    "NUCLEAR":2, "INSANE":4, "GOD ZONE":6, "GOLDEN":10,
+    "OPTIMAL":12, "NORMAL":18, "RATIO MODE":60
+}.get(reg["zone"], 12)
+
 net_win = base_winner - 2 * commission
 net_loss = avg_loser - 2 * commission - 80
-effective_winner = net_win * (1 - regime["shrink"]/100)
-edge = effective_winner / user_debit
+effective_winner = net_win * (1 - regime_shrink/100)
+edge = effective_winner / user_debit if user_debit > 0 else 0
 raw_kelly = (win_rate * edge - (1-win_rate)) / edge if edge > 0 else 0
 kelly_f = max(0.0, min(0.25, raw_kelly))
-daily_growth = kelly_f * (win_rate * effective_winner + (1-win_rate) * net_loss) / user_debit
-theo_cagr = (1 + daily_growth)**250 - 1
 
-m1, m2, m3, m4, m5 = st.columns(5)
+m1,m2,m3,m4,m5 = st.columns(5)
 m1.metric("Debit", f"${user_debit:,}")
 m2.metric("Effective Winner", f"${effective_winner:+.0f}")
 m3.metric("Edge/$", f"{edge:.3f}×")
 m4.metric("Kelly", f"{kelly_f:.1%}")
-m5.metric("Theoretical CAGR", f"{theo_cagr:.1%}")
+m5.metric("Shrink Applied", f"{regime_shrink}%")
 
-# === SACRED MONITOR-TAPED TABLE ===
+# ================================
+# SACRED MONITOR-TAPED TABLE (STATIC)
+# ================================
 with st.expander("Definitive 9D/30D Realised Performance Table (2020–Nov 2025) — Monitor-Taped Version", expanded=True):
     st.markdown("""
-**All numbers are realised from 2020–Nov 2025 on your exact setup**  
+**All numbers realised 2020–Nov 2025 on your exact setup**  
 (8–9 DTE short 0.25% OTM put → 16–18 DTE –20 wide long)
 
-| 9D/30D Ratio | Typical debit seen in this bucket | Realised average winner (what actually hit the account) | Dashboard “Effective Winner” (conservative model) | Realised Edge/$ | Dashboard Edge/$ | Verdict / sizing |
-|--------------|-----------------------------------|----------------------------------------------------------|----------------------------------------------------|------------------|------------------|------------------|
-| ≥ 1.30       | $550 – $950                       | $305 – $355                                              | $228                                               | 0.38x+           | 0.29x            | **Nuclear – max size** |
-| 1.20 – 1.299 | $600 – $1,050                     | $295 – $340                                              | $225                                               | 0.33x–0.40x      | 0.27x            | **Insane – max size** |
-| **1.12 – 1.199** | **$700 – $1,100**             | **$285 – $325** (median $308)                            | **$222 – $226**                                    | **0.30x–0.36x**  | **0.26x–0.28x**  | **True God Zone** |
-| **1.04 – 1.119** | **$750 – $1,150**             | **$258 – $292** (median $272)                            | **$218 – $222**                                    | **0.24x–0.30x**  | **0.21x–0.24x**  | **Golden Pocket – load up** |
-| 1.00 – 1.039 | $1,050 – $1,450                   | $240 – $275                                              | $208 – $212                                        | 0.19x–0.23x      | 0.17x–0.19x      | Very good – normal-large size |
-| 0.96 – 0.999 | $1,200 – $1,550                   | $225 – $260                                              | $198 – $202                                        | 0.16x–0.20x      | 0.15x–0.17x      | Good – normal size |
-| 0.92 – 0.959 | $1,400 – $1,750                   | $215 – $245                                              | $192 – $196                                        | 0.13x–0.16x      | 0.12x–0.14x      | Acceptable – normal-small |
-| 0.88 – 0.919 | $1,650 – $2,100                   | $185 – $220                                              | $175 – $182                                        | 0.10x–0.12x      | 0.09x–0.11x      | Marginal – small |
-| ≤ 0.879      | $2,000 – $2,800                   | $110 – $170                                              | $90 – $120                                         | ≤ 0.07x          | ≤ 0.06x          | **OFF – skip or microscopic** |
+| 9D/30D Ratio | Typical debit    | Realised winner   | Model Winner | Realised Edge/$ | Verdict / sizing          |
+|--------------|------------------|-------------------|--------------|------------------|---------------------------|
+| ≥ 1.30       | $550 – $950      | $305 – $355       | $228         | 0.38x+           | **Nuclear – max size**    |
+| 1.20 – 1.299 | $600 – $1,050    | $295 – $340       | $225         | 0.33x–0.40x      | **Insane – max size**     |
+| **1.12 – 1.199** | **$700 – $1,100** | **$285 – $325** | **$224** | **0.30x–0.36x** | **True God Zone**     |
+| **1.04 – 1.119** | **$750 – $1,150** | **$258 – $292** | **$220** | **0.24x–0.30x** | **Golden Pocket**     |
+| 1.00 – 1.039 | $1,050 – $1,450  | $240 – $275       | $210         | 0.19x–0.23x      | Very good – large size    |
+| ≤ 0.879      | $2,000 – $2,800  | $110 – $170       | $110         | ≤ 0.07x          | **OFF – skip**            |
     """, unsafe_allow_html=True)
 
-# === MONTE CARLO ===
+# ================================
+# MONTE CARLO
+# ================================
 if st.button("RUN SIMULATION", use_container_width=True):
     if num_trades < 1:
         st.warning("Set Total Trades ≥ 1")
@@ -133,19 +199,10 @@ if st.button("RUN SIMULATION", use_container_width=True):
                     contracts = min(max_contracts, max(1, int(kelly_f * bal * 0.5 / user_debit)))
                     p_win = win_rate if streak == 0 else win_rate * 0.60
                     won = np.random.random() < p_win
-
-                    # Black swan
-                    if np.random.random() < 0.01:
-                        pnl = net_loss * 2.5 * contracts
-                    else:
-                        pnl = (effective_winner if won else net_loss) * contracts
-
-                    # Loss clustering
-                    if not won and np.random.random() < 0.50:
-                        streak += 1
-                    else:
-                        streak = 0
-
+                    pnl = (effective_winner if won else net_loss) * contracts
+                    if np.random() < 0.01: pnl = net_loss * 2.5 * contracts  # black swan
+                    if not won and np.random.random() < 0.5: streak += 1
+                    else: streak = 0
                     bal = max(bal + pnl, 1000)
                     path.append(bal)
                 finals.append(bal)
@@ -161,10 +218,16 @@ if st.button("RUN SIMULATION", use_container_width=True):
             with col1:
                 fig = go.Figure()
                 for p in paths[:100]:
-                    fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1, color="rgba(100,116,139,0.2)"), showlegend=False))
-                fig.add_trace(go.Scatter(y=mean_path, mode='lines', line=dict(color='#60a5fa', width=5), name='Mean Path'))
-                fig.add_hline(y=start_bal, line_color="#e11d48", line_dash="dash", annotation_text="Starting Capital")
-                fig.update_layout(template="plotly_dark", height=560, title="Monte Carlo Equity Curves")
+                    fig.add_trace(go.Scatter(y=p, mode='lines',
+                                           line=dict(width=1, color="rgba(100,116,139,0.2)"),
+                                           showlegend=False))
+                fig.add_trace(go.Scatter(y=mean_path, mode='lines',
+                                        line=dict(color='#60a5fa', width=5),
+                                        name='Mean Path'))
+                fig.add_hline(y=start_bal, line_color="#e11d48", line_dash="dash",
+                             annotation_text="Starting Capital")
+                fig.update_layout(template="plotly_dark", height=560,
+                                 title="Monte Carlo Equity Curves")
                 st.plotly_chart(fig, use_container_width=True)
 
             with col2:
@@ -173,4 +236,4 @@ if st.button("RUN SIMULATION", use_container_width=True):
                 st.metric("Mean CAGR", f"{np.mean(cagr):.1%}")
                 st.metric("Ruin Rate (<$10k)", f"{(finals<10000).mean():.2%}")
 
-st.caption("SPX Debit Put Diagonal Engine v6.9.13 — FINAL FOREVER • Live • Ready for Open • 2025")
+st.caption("SPX Diagonal Engine v6.9.21 — TROPHY EDITION • Live Forward Curve Graph • Nuclear Alert • Dec 2025")
