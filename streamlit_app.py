@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.30 — DAILY FORWARD", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.31 — DAILY + FULL", layout="wide")
 
 # ================================
 # STYLE
@@ -21,7 +21,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ================================
-# LIVE + DAILY FORWARD 9D/30D (31 POINTS) — NO SCIPY
+# DAILY FORWARD 9D/30D (NO SCIPY)
 # ================================
 @st.cache_data(ttl=60)
 def get_daily_forward_curve():
@@ -31,17 +31,14 @@ def get_daily_forward_curve():
         spot_ratio = round(vix9d / vix, 3) if vix > 0 else 0.929
 
         # UPDATE THIS ONE LINE EVERY MONTH
-        next_future = "VXZ25"          # ← Dec 2025 → VXF26 in Jan, etc.
+        next_future = "VXZ25"           # ← Dec 2025 → Jan: VXF26, Feb: VXG26, etc.
         fut_price = yf.Ticker(next_future).info.get('regularMarketPrice', vix * 1.02)
         forward_30d = round(vix / fut_price, 3)
 
-        # Pure-numpy smooth daily interpolation (cubic-like)
         days = np.arange(0, 31)
-        # Creates a nice smooth curve from spot → +30d
-        ratios = spot_ratio + (forward_30d - spot_ratio) * (
-            3 * (days/30)**2 - 2 * (days/30)**3
-        )  # Smoothstep easing — looks perfect
-
+        # Smooth cubic-like interpolation (pure numpy)
+        t = days / 30
+        ratios = spot_ratio + (forward_30d - spot_ratio) * (3*t**2 - 2*t**3)
         labels = ["Today"] + [f"+{d}d" for d in range(1, 31)]
 
         spx = yf.Ticker("^GSPC").info.get('regularMarketPrice', 6000.0)
@@ -87,7 +84,7 @@ with c4:
         mode='lines+markers+text',
         line=dict(color='#60a5fa', width=7),
         marker=dict(size=14),
-        text=[f"{r:.3f}" for r in daily_ratios[::4]],   # every 4th day labeled
+        text=[f"{r:.3f}" for r in daily_ratios[::4]],
         textposition="top center",
         textfont=dict(size=13, color="#e2e8f0")
     ))
@@ -108,17 +105,17 @@ with c4:
 # ================================
 if regime["alert"]:
     st.error("NUCLEAR ALERT — MAX SIZE DIAGONALS RIGHT NOW")
-elif max(daily_ratios[1:10]) > spot_ratio + 0.03:
-    st.success("Forward rising next 10 days — GOD ZONE INCOMING")
+elif max(daily_ratios[1:15]) > spot_ratio + 0.03:
+    st.success("Forward rising next 2 weeks — GOD ZONE INCOMING — SCALE UP")
 elif min(daily_ratios[5:]) < spot_ratio - 0.04:
-    st.warning("Forward falling soon — Reduce size")
+    st.warning("Forward falling soon — Reduce size or skip")
 else:
     st.info("Forward stable — Normal sizing")
 
 st.markdown("---")
 
 # ================================
-# INPUTS & CALCULATIONS (unchanged)
+# INPUTS & CALCULATIONS
 # ================================
 left, right = st.columns(2)
 with left:
@@ -129,9 +126,11 @@ with left:
     loser = st.number_input("Average Loser ($)", value=-1206, step=25)
     comm = st.number_input("Commission RT ($)", value=1.3, step=0.1)
 with right:
-    st.subheader("Simulation")
+    st.subheader("Monte Carlo Simulation")
     start_bal = st.number_input("Starting Capital ($)", value=100000, step=25000)
     max_cont = st.number_input("Max Contracts", value=10, min_value=1)
+    trades = st.slider("Total Trades", 10, 3000, 150, 10)
+    paths = st.slider("Monte Carlo Paths", 50, 1000, 300, 25)
 
 net_win = winner - 2 * comm
 eff_winner = net_win * (1 - regime["shrink"]/100)
@@ -147,9 +146,18 @@ m4.metric("Kelly", f"{kelly_f:.1%}")
 m5.metric("Shrink", f"{regime['shrink']}%")
 
 # ================================
-# SACRED TABLE + MONTE CARLO (same as before — omitted for brevity but fully functional)
+# SACRED TABLE (your legend)
 # ================================
-with st.expander("Sacred Table & Monte Carlo", expanded=False):
-    st.markdown("*(Full table and Monte Carlo code unchanged from previous working version)*")
+with st.expander("Sacred 9D/30D Performance Table (2020–Nov 2025) — Your Legend", expanded=True):
+    st.markdown("""
+**Realised | 8–9 DTE short 0.25% OTM put → 16–18 DTE –20 wide long**
 
-st.caption("SPX Diagonal Engine v6.9.30 — DAILY Forward • No scipy • Runs on Streamlit Cloud • Dec 2025")
+| 9D/30D Ratio     | Typical debit       | Realised winner       | Model Winner | Realised Edge/$ | Verdict                |
+|------------------|---------------------|------------------------|--------------|------------------|------------------------|
+| ≥ 1.12           | $550 – $1,100       | $285 – $355            | $224+        | 0.30x+           | **MAXIMUM / NUCLEAR**  |
+| 1.04 – 1.119     | $750 – $1,150       | $258 – $292            | $220         | 0.24x–0.30x      | **ENHANCED**           |
+| 0.94 – 1.039     | $1,050 – $1,550     | $225 – $275            | $208         | 0.19x–0.23x      | **OPTIMAL**            |
+| 0.88 – 0.939     | $1,400 – $1,750     | $215 – $245            | $195         | 0.13x–0.16x      | **ACCEPTABLE**         |
+| 0.84 – 0.879     | $1,650 – $2,100     | $185 – $220            | $180         | 0.10x–0.12x      | **MARGINAL**           |
+| ≤ 0.839          | $2,000 – $2,800     | $110 – $170            | $110         | ≤ 0.07x          | **OFF**                |
+    """, unsafe
