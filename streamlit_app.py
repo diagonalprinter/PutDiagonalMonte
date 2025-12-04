@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.31 — DAILY + FULL", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.32 — FINAL", layout="wide")
 
 # ================================
 # STYLE
@@ -31,12 +31,11 @@ def get_daily_forward_curve():
         spot_ratio = round(vix9d / vix, 3) if vix > 0 else 0.929
 
         # UPDATE THIS ONE LINE EVERY MONTH
-        next_future = "VXZ25"           # ← Dec 2025 → Jan: VXF26, Feb: VXG26, etc.
+        next_future = "VXZ25"                    # Dec 2025 → Jan 2026 = VXF26
         fut_price = yf.Ticker(next_future).info.get('regularMarketPrice', vix * 1.02)
         forward_30d = round(vix / fut_price, 3)
 
         days = np.arange(0, 31)
-        # Smooth cubic-like interpolation (pure numpy)
         t = days / 30
         ratios = spot_ratio + (forward_30d - spot_ratio) * (3*t**2 - 2*t**3)
         labels = ["Today"] + [f"+{d}d" for d in range(1, 31)]
@@ -121,7 +120,8 @@ left, right = st.columns(2)
 with left:
     st.subheader("Strategy Parameters")
     debit = st.number_input("Current Debit ($)", 100, 5000, 1350, 10)
-    winrate = st.slider("Win Rate (%)", 80.0, 99.9, 96.0, 0.1) / 100
+    winrate_pct = st.slider("Win Rate (%)", 0, 100, 96, 1)        # ← NOW 0–100 WHOLE NUMBERS
+    winrate = winrate_pct / 100
     winner = st.number_input("Theoretical Winner ($)", value=230, step=5)
     loser = st.number_input("Average Loser ($)", value=-1206, step=25)
     comm = st.number_input("Commission RT ($)", value=1.3, step=0.1)
@@ -146,7 +146,7 @@ m4.metric("Kelly", f"{kelly_f:.1%}")
 m5.metric("Shrink", f"{regime['shrink']}%")
 
 # ================================
-# SACRED TABLE (your legend)
+# SACRED TABLE
 # ================================
 with st.expander("Sacred 9D/30D Performance Table (2020–Nov 2025) — Your Legend", expanded=True):
     st.markdown("""
@@ -159,5 +159,44 @@ with st.expander("Sacred 9D/30D Performance Table (2020–Nov 2025) — Your Leg
 | 0.94 – 1.039     | $1,050 – $1,550     | $225 – $275            | $208         | 0.19x–0.23x      | **OPTIMAL**            |
 | 0.88 – 0.939     | $1,400 – $1,750     | $215 – $245            | $195         | 0.13x–0.16x      | **ACCEPTABLE**         |
 | 0.84 – 0.879     | $1,650 – $2,100     | $185 – $220            | $180         | 0.10x–0.12x      | **MARGINAL**           |
-| ≤ 0.839          | $2,000 – $2,800     | $110 – $170            | $110         | ≤ 0.07x          | **OFF**                |
-    """, unsafe
+| ≤ 0.839          | $2,000 – $2,800     | $110 – $170            | $110         | ≤ 0.Concurrent07x          | **OFF**                |
+    """, unsafe_allow_html=True)
+
+# ================================
+# FULL MONTE CARLO
+# ================================
+if st.button("RUN MONTE CARLO", use_container_width=True):
+    with st.spinner(f"Running {paths} paths × {trades} trades..."):
+        np.random.seed(42)
+        finals = []
+        all_paths = []
+        for _ in range(paths):
+            bal = start_bal
+            path = [bal]
+            for _ in range(trades):
+                contracts = min(max_cont, max(1, int(kelly_f * bal * 0.5 / debit)))
+                won = np.random.random() < winrate
+                pnl = (eff_winner if won else loser) * contracts
+                bal = max(bal + pnl, 1000)
+                path.append(bal)
+            finals.append(bal)
+            all_paths.append(path)
+        
+        finals = np.array(finals)
+        mean_path = np.mean(all_paths, axis=0)
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            fig = go.Figure()
+            for p in all_paths[:100]:
+                fig.add_trace(go.Scatter(y=p, mode='lines', line=dict(width=1, color="#475569"), showlegend=False))
+            fig.add_trace(go.Scatter(y=mean_path, mode='lines', line=dict(color='#60a5fa', width=5), name='Mean Path'))
+            fig.add_hline(y=start_bal, line_color="#e11d48", line_dash="dash")
+            fig.update_layout(height=560, template="plotly_dark", title="Monte Carlo Equity Curves")
+            st.plotly_chart(fig, use_container_width=True)
+        with col2:
+            st.metric("Median Final", f"${np.median(finals)/1e6:.2f}M")
+            st.metric("95th Percentile", f"${np.percentile(finals,95)/1e6:.2f}M")
+            st.metric("Ruin Rate", f"{(finals<10000).mean():.2%}")
+
+st.caption("SPX Diagonal Engine v6.9.32 — DAILY Forward • Full Table • Full MC • Win Rate 0-100 • Dec 2025")
