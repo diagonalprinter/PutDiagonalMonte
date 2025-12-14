@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.32 — FINAL", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.33 — VRP + DAILY", layout="wide")
 
 # ================================
 # STYLE
@@ -21,34 +21,42 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ================================
-# DAILY FORWARD 9D/30D (NO SCIPY)
+# LIVE + DAILY FORWARD + DUAL VRP
 # ================================
 @st.cache_data(ttl=60)
-def get_daily_forward_curve():
+def get_data():
     try:
+        # Implied
         vix9d = yf.Ticker("^VIX9D").info.get('regularMarketPrice', 18.4)
-        vix   = yf.Ticker("^VIX").info.get('regularMarketPrice', 18.1)
+        vix = yf.Ticker("^VIX").info.get('regularMarketPrice', 18.1)
         spot_ratio = round(vix9d / vix, 3) if vix > 0 else 0.929
 
-        # UPDATE THIS ONE LINE EVERY MONTH
-        next_future = "VXZ25"                    # Dec 2025 → Jan 2026 = VXF26
+        # Forward (next month future)
+        next_future = "VXZ25"  # ← UPDATE THIS ONE LINE EVERY MONTH (Jan 2026 = VXF26)
         fut_price = yf.Ticker(next_future).info.get('regularMarketPrice', vix * 1.02)
         forward_30d = round(vix / fut_price, 3)
 
+        # Daily interpolation
         days = np.arange(0, 31)
         t = days / 30
         ratios = spot_ratio + (forward_30d - spot_ratio) * (3*t**2 - 2*t**3)
         labels = ["Today"] + [f"+{d}d" for d in range(1, 31)]
 
-        spx = yf.Ticker("^GSPC").info.get('regularMarketPrice', 6000.0)
-        return spot_ratio, ratios.tolist(), labels, round(spx, 1)
-    except:
-        days = np.arange(0, 31)
-        ratios = np.linspace(0.929, 0.935, 31)
-        labels = ["Today"] + [f"+{d}d" for d in range(1, 31)]
-        return 0.929, ratios.tolist(), labels, 6000.0
+        # Realized Volatility (RV)
+        spx_hist = yf.download("^GSPC", period="60d")['Close']
+        returns = np.log(spx_hist / spx_hist.shift(1)).dropna()
+        rv9d = np.std(returns[-9:]) * np.sqrt(252) * 100   # 9-day annualized RV
+        rv30d = np.std(returns[-30:]) * np.sqrt(252) * 100  # 30-day annualized RV
 
-spot_ratio, daily_ratios, daily_labels, spx_price = get_daily_forward_curve()
+        vrp_short = vix9d - rv9d
+        vrp_long = vix - rv30d
+
+        spx = yf.Ticker("^GSPC").info.get('regularMarketPrice', 6000.0)
+        return spot_ratio, ratios.tolist(), labels, vrp_short, vrp_long, round(spx, 1)
+    except:
+        return 0.929, np.linspace(0.929, 0.935, 31).tolist(), ["Today"] + [f"+{d}d" for d in range(1, 31)], 6.5, 4.2, 6000.0
+
+spot_ratio, daily_ratios, daily_labels, vrp_short, vrp_long, spx_price = get_data()
 now_str = datetime.now().strftime("%b %d, %H:%M ET")
 
 # ================================
@@ -65,17 +73,23 @@ def get_regime(r):
 regime = get_regime(spot_ratio)
 
 # ================================
-# HEADER + DAILY FORWARD GRAPH
+# HEADER + DAILY FORWARD + VRP METRICS
 # ================================
-c1, c2, c3, c4 = st.columns([1.3, 1.3, 1.3, 3.1])
+c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
     st.markdown(f'<div class="header-card"><p class="small">Spot 9D/30D</p><p class="big">{spot_ratio}</p></div>', unsafe_allow_html=True)
 with c2:
     alert_class = 'nuclear' if regime["alert"] else ''
     st.markdown(f'<div class="header-card {alert_class}"><p class="small">Regime</p><p class="big">{regime["zone"]}</p></div>', unsafe_allow_html=True)
 with c3:
-    st.markdown(f'<div class="header-card"><p class="small">Forward +30d</p><p class="big">{daily_ratios[-1]:.3f}</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="header-card"><p class="small">Short VRP</p><p class="big">{vrp_short:+.1f}</p><p class="small">VIX9D - 9d RV</p></div>', unsafe_allow_html=True)
 with c4:
+    st.markdown(f'<div class="header-card"><p class="small">Long VRP</p><p class="big">{vrp_long:+.1f}</p><p class="small">VIX - 30d RV</p></div>', unsafe_allow_html=True)
+with c5:
+    st.markdown(f'<div class="header-card"><p class="small">SPX Live</p><p class="big">{spx_price:,.0f}</p><p class="small">{now_str}</p></div>', unsafe_allow_html=True)
+
+# Daily forward graph (same as v6.9.32 — tall, legible)
+with st.container():
     ymin, ymax = min(daily_ratios) - 0.03, max(daily_ratios) + 0.03
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -100,16 +114,16 @@ with c4:
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
 # ================================
-# ALERTS
+# ALERTS (enhanced with VRP)
 # ================================
 if regime["alert"]:
     st.error("NUCLEAR ALERT — MAX SIZE DIAGONALS RIGHT NOW")
-elif max(daily_ratios[1:15]) > spot_ratio + 0.03:
-    st.success("Forward rising next 2 weeks — GOD ZONE INCOMING — SCALE UP")
-elif min(daily_ratios[5:]) < spot_ratio - 0.04:
-    st.warning("Forward falling soon — Reduce size or skip")
+elif vrp_short > 8:
+    st.success("High Short VRP — Strong crush expected on short leg")
+elif vrp_short < 2:
+    st.warning("Low Short VRP — Crush weak, consider skipping")
 else:
-    st.info("Forward stable — Normal sizing")
+    st.info("Normal VRP — Trade as usual")
 
 st.markdown("---")
 
@@ -120,7 +134,7 @@ left, right = st.columns(2)
 with left:
     st.subheader("Strategy Parameters")
     debit = st.number_input("Current Debit ($)", 100, 5000, 1350, 10)
-    winrate_pct = st.slider("Win Rate (%)", 0, 100, 96, 1)        # ← NOW 0–100 WHOLE NUMBERS
+    winrate_pct = st.slider("Win Rate (%)", 0, 100, 96, 1)
     winrate = winrate_pct / 100
     winner = st.number_input("Theoretical Winner ($)", value=230, step=5)
     loser = st.number_input("Average Loser ($)", value=-1206, step=25)
@@ -148,7 +162,7 @@ m5.metric("Shrink", f"{regime['shrink']}%")
 # ================================
 # SACRED TABLE
 # ================================
-with st.expander("Sacred 9D/30D Performance Table (2020–Nov 2025) — Your Legend", expanded=True):
+with st.expander("Sacred 9D/30D Performance Table (2020–Nov 2025)", expanded=True):
     st.markdown("""
 **Realised | 8–9 DTE short 0.25% OTM put → 16–18 DTE –20 wide long**
 
@@ -159,11 +173,11 @@ with st.expander("Sacred 9D/30D Performance Table (2020–Nov 2025) — Your Leg
 | 0.94 – 1.039     | $1,050 – $1,550     | $225 – $275            | $208         | 0.19x–0.23x      | **OPTIMAL**            |
 | 0.88 – 0.939     | $1,400 – $1,750     | $215 – $245            | $195         | 0.13x–0.16x      | **ACCEPTABLE**         |
 | 0.84 – 0.879     | $1,650 – $2,100     | $185 – $220            | $180         | 0.10x–0.12x      | **MARGINAL**           |
-| ≤ 0.839          | $2,000 – $2,800     | $110 – $170            | $110         | ≤ 0.Concurrent07x          | **OFF**                |
+| ≤ 0.839          | $2,000 – $2,800     | $110 – $170            | $110         | ≤ 0.07x          | **OFF**                |
     """, unsafe_allow_html=True)
 
 # ================================
-# FULL MONTE CARLO
+# MONTE CARLO (full)
 # ================================
 if st.button("RUN MONTE CARLO", use_container_width=True):
     with st.spinner(f"Running {paths} paths × {trades} trades..."):
@@ -173,10 +187,13 @@ if st.button("RUN MONTE CARLO", use_container_width=True):
         for _ in range(paths):
             bal = start_bal
             path = [bal]
+            streak = 0
             for _ in range(trades):
                 contracts = min(max_cont, max(1, int(kelly_f * bal * 0.5 / debit)))
-                won = np.random.random() < winrate
+                won = np.random.random() < (winrate if streak == 0 else winrate * 0.6)
                 pnl = (eff_winner if won else loser) * contracts
+                if np.random.random() < 0.01: pnl = loser * 2.5 * contracts
+                streak = streak + 1 if not won and np.random.random() < 0.5 else 0
                 bal = max(bal + pnl, 1000)
                 path.append(bal)
             finals.append(bal)
@@ -199,4 +216,4 @@ if st.button("RUN MONTE CARLO", use_container_width=True):
             st.metric("95th Percentile", f"${np.percentile(finals,95)/1e6:.2f}M")
             st.metric("Ruin Rate", f"{(finals<10000).mean():.2%}")
 
-st.caption("SPX Diagonal Engine v6.9.32 — DAILY Forward • Full Table • Full MC • Win Rate 0-100 • Dec 2025")
+st.caption("SPX Diagonal Engine v6.9.33 — DAILY Forward + Live Dual VRP • Full Table • Full MC • Dec 2025")
