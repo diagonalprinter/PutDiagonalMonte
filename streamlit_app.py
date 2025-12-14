@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.34 — VRP SAFE", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.34 — FIXED VRP/SPX + SQUARE GRAPH", layout="wide")
 
 # ================================
 # STYLE
@@ -21,7 +21,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ================================
-# LIVE + DAILY FORWARD + DUAL VRP (SAFE)
+# LIVE + DAILY FORWARD + DUAL VRP (FIXED)
 # ================================
 @st.cache_data(ttl=60)
 def get_data():
@@ -42,8 +42,8 @@ def get_data():
         ratios = spot_ratio + (forward_30d - spot_ratio) * (3*t**2 - 2*t**3)
         labels = ["Today"] + [f"+{d}d" for d in range(1, 31)]
 
-        # Realized Volatility (RV)
-        spx_hist = yf.download("^GSPC", period="60d", progress=False)['Close']
+        # Realized Volatility (RV) — increased period to 90d for safety
+        spx_hist = yf.download("^GSPC", period="90d", progress=False)['Close']
         returns = np.log(spx_hist / spx_hist.shift(1)).dropna()
         rv9d = np.std(returns[-9:]) * np.sqrt(252) * 100 if len(returns) >= 9 else np.nan
         rv30d = np.std(returns[-30:]) * np.sqrt(252) * 100 if len(returns) >= 30 else np.nan
@@ -51,7 +51,15 @@ def get_data():
         vrp_short = vix9d - rv9d if not np.isnan(rv9d) else np.nan
         vrp_long = vix - rv30d if not np.isnan(rv30d) else np.nan
 
-        spx = yf.Ticker("^GSPC").info.get('regularMarketPrice', 6000.0)
+        # SPX price — fallback to download if info fails
+        try:
+            spx = yf.Ticker("^GSPC").info.get('regularMarketPrice', np.nan)
+        except:
+            spx = np.nan
+        if np.isnan(spx):
+            spx_hist_day = yf.download("^GSPC", period="2d", progress=False)['Close']
+            spx = spx_hist_day.iloc[-1] if not spx_hist_day.empty else 6000.0
+
         return spot_ratio, ratios.tolist(), labels, vrp_short, vrp_long, round(spx, 1)
     except:
         return 0.929, np.linspace(0.929, 0.935, 31).tolist(), ["Today"] + [f"+{d}d" for d in range(1, 31)], np.nan, np.nan, 6000.0
@@ -217,4 +225,4 @@ if st.button("RUN MONTE CARLO", use_container_width=True):
             st.metric("95th Percentile", f"${np.percentile(finals,95)/1e6:.2f}M")
             st.metric("Ruin Rate", f"{(finals<10000).mean():.2%}")
 
-st.caption("SPX Diagonal Engine v6.9.33 — DAILY Forward + Live Dual VRP • Full Table • Full MC • Dec 2025")
+st.caption("SPX Diagonal Engine v6.9.34 — DAILY Forward + Live Dual VRP • Full Table • Full MC • Dec 2025")
