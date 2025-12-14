@@ -43,10 +43,10 @@ def get_data():
         labels = ["Today"] + [f"+{d}d" for d in range(1, 31)]
 
         # Realized Volatility (RV)
-        spx_hist = yf.download("^GSPC", period="60d")['Close']
+        spx_hist = yf.download("^GSPC", period="60d", progress=False)['Close']
         returns = np.log(spx_hist / spx_hist.shift(1)).dropna()
-        rv9d = np.std(returns[-9:]) * np.sqrt(252) * 100   # 9-day annualized RV
-        rv30d = np.std(returns[-30:]) * np.sqrt(252) * 100  # 30-day annualized RV
+        rv9d = np.std(returns[-9:]) * np.sqrt(252) * 100 if len(returns) >= 9 else 12.0
+        rv30d = np.std(returns[-30:]) * np.sqrt(252) * 100 if len(returns) >= 30 else 11.0
 
         vrp_short = vix9d - rv9d
         vrp_long = vix - rv30d
@@ -88,30 +88,29 @@ with c4:
 with c5:
     st.markdown(f'<div class="header-card"><p class="small">SPX Live</p><p class="big">{spx_price:,.0f}</p><p class="small">{now_str}</p></div>', unsafe_allow_html=True)
 
-# Daily forward graph (same as v6.9.32 — tall, legible)
-with st.container():
-    ymin, ymax = min(daily_ratios) - 0.03, max(daily_ratios) + 0.03
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=daily_labels, y=daily_ratios,
-        mode='lines+markers+text',
-        line=dict(color='#60a5fa', width=7),
-        marker=dict(size=14),
-        text=[f"{r:.3f}" for r in daily_ratios[::4]],
-        textposition="top center",
-        textfont=dict(size=13, color="#e2e8f0")
-    ))
-    fig.add_hline(y=1.0, line_dash="dash", line_color="#e11d48", annotation_text="1.00")
-    fig.update_layout(
-        title="Daily Forward 9D/30D Curve — Next 30 Days",
-        height=360,
-        margin=dict(l=30,r=30,t=60,b=30),
-        paper_bgcolor="#1e293b", plot_bgcolor="#1e293b",
-        font_color="#e2e8f0",
-        yaxis=dict(range=[ymin, ymax], dtick=0.01, gridcolor="#334155"),
-        xaxis=dict(tickangle=45, showgrid=False)
-    )
-    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+# Daily forward graph
+ymin, ymax = min(daily_ratios) - 0.03, max(daily_ratios) + 0.03
+fig = go.Figure()
+fig.add_trace(go.Scatter(
+    x=daily_labels, y=daily_ratios,
+    mode='lines+markers+text',
+    line=dict(color='#60a5fa', width=7),
+    marker=dict(size=14),
+    text=[f"{r:.3f}" for r in daily_ratios[::4]],
+    textposition="top center",
+    textfont=dict(size=13, color="#e2e8f0")
+))
+fig.add_hline(y=1.0, line_dash="dash", line_color="#e11d48", annotation_text="1.00")
+fig.update_layout(
+    title="Daily Forward 9D/30D Curve — Next 30 Days",
+    height=360,
+    margin=dict(l=30,r=30,t=60,b=30),
+    paper_bgcolor="#1e293b", plot_bgcolor="#1e293b",
+    font_color="#e2e8f0",
+    yaxis=dict(range=[ymin, ymax], dtick=0.01, gridcolor="#334155"),
+    xaxis=dict(tickangle=45, showgrid=False)
+)
+st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
 # ================================
 # ALERTS (enhanced with VRP)
@@ -177,7 +176,7 @@ with st.expander("Sacred 9D/30D Performance Table (2020–Nov 2025)", expanded=T
     """, unsafe_allow_html=True)
 
 # ================================
-# MONTE CARLO (full)
+# MONTE CARLO
 # ================================
 if st.button("RUN MONTE CARLO", use_container_width=True):
     with st.spinner(f"Running {paths} paths × {trades} trades..."):
