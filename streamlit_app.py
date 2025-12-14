@@ -215,4 +215,4 @@ if st.button("RUN MONTE CARLO", use_container_width=True):
             st.metric("95th Percentile", f"${np.percentile(finals,95)/1e6:.2f}M")
             st.metric("Ruin Rate", f"{(finals<10000).mean():.2%}")
 
-st.caption("SPX Diagonal Engine v6.9.33 — DAILY Forward + Live Dual VRP • Full Table • Full MC • Dec 2025") 
+st.caption("SPX Diagonal Engine v6.9.33 — DAILY Forward + Live Dual VRP • Full Table • Full MC • Dec 2025")
