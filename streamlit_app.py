@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.35 — CLEAN GRAPH", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.34 — FIXED VRP/SPX + SQUARE GRAPH", layout="wide")
 
 # ================================
 # STYLE
@@ -21,7 +21,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ================================
-# LIVE + DAILY FORWARD + DUAL VRP (SAFE)
+# LIVE + DAILY FORWARD + DUAL VRP (FIXED)
 # ================================
 @st.cache_data(ttl=60)
 def get_data():
@@ -42,7 +42,7 @@ def get_data():
         ratios = spot_ratio + (forward_30d - spot_ratio) * (3*t**2 - 2*t**3)
         labels = ["Today"] + [f"+{d}d" for d in range(1, 31)]
 
-        # Realized Volatility (RV) — 90d for safety
+        # Realized Volatility (RV) — increased period to 90d for safety
         spx_hist = yf.download("^GSPC", period="90d", progress=False)['Close']
         returns = np.log(spx_hist / spx_hist.shift(1)).dropna()
         rv9d = np.std(returns[-9:]) * np.sqrt(252) * 100 if len(returns) >= 9 else np.nan
@@ -51,7 +51,7 @@ def get_data():
         vrp_short = vix9d - rv9d if not np.isnan(rv9d) else np.nan
         vrp_long = vix - rv30d if not np.isnan(rv30d) else np.nan
 
-        # SPX price fallback
+        # SPX price — fallback to download if info fails
         try:
             spx = yf.Ticker("^GSPC").info.get('regularMarketPrice', np.nan)
         except:
@@ -81,7 +81,7 @@ def get_regime(r):
 regime = get_regime(spot_ratio)
 
 # ================================
-# HEADER + VRP METRICS
+# HEADER + DAILY FORWARD + VRP METRICS (SAFE DISPLAY)
 # ================================
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
@@ -98,10 +98,8 @@ with c4:
 with c5:
     st.markdown(f'<div class="header-card"><p class="small">SPX Live</p><p class="big">{spx_price:,.0f}</p><p class="small">{now_str}</p></div>', unsafe_allow_html=True)
 
-# ================================
-# DAILY FORWARD GRAPH — CLEANER & LESS SQUISHED
-# ================================
-ymin, ymax = min(daily_ratios) - 0.04, max(daily_ratios) + 0.04
+# Daily forward graph (more square, spaced ticks)
+ymin, ymax = min(daily_ratios) - 0.03, max(daily_ratios) + 0.03
 fig = go.Figure()
 fig.add_trace(go.Scatter(
     x=daily_labels, y=daily_ratios,
@@ -113,7 +111,7 @@ fig.add_trace(go.Scatter(
 fig.add_hline(y=1.0, line_dash="dash", line_color="#e11d48", annotation_text="1.00")
 fig.update_layout(
     title="Daily Forward 9D/30D Curve — Next 30 Days",
-    height=450,  # Taller for more vertical breathing room
+    height=420,  # Taller for more square shape
     margin=dict(l=40, r=40, t=60, b=40),
     paper_bgcolor="#1e293b", plot_bgcolor="#1e293b",
     font_color="#e2e8f0",
@@ -129,12 +127,12 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
 # ================================
-# ALERTS
+# ALERTS (enhanced with VRP)
 # ================================
 if regime["alert"]:
     st.error("NUCLEAR ALERT — MAX SIZE DIAGONALS RIGHT NOW")
 elif not np.isnan(vrp_short) and vrp_short > 8:
-    st.success("High Short VRP — Strong crush expected")
+    st.success("High Short VRP — Strong crush expected on short leg")
 elif not np.isnan(vrp_short) and vrp_short < 2:
     st.warning("Low Short VRP — Crush weak, consider skipping")
 else:
