@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.33 — VRP + DAILY", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.34 — VRP SAFE", layout="wide")
 
 # ================================
 # STYLE
@@ -21,7 +21,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ================================
-# LIVE + DAILY FORWARD + DUAL VRP
+# LIVE + DAILY FORWARD + DUAL VRP (SAFE)
 # ================================
 @st.cache_data(ttl=60)
 def get_data():
@@ -45,16 +45,16 @@ def get_data():
         # Realized Volatility (RV)
         spx_hist = yf.download("^GSPC", period="60d", progress=False)['Close']
         returns = np.log(spx_hist / spx_hist.shift(1)).dropna()
-        rv9d = np.std(returns[-9:]) * np.sqrt(252) * 100 if len(returns) >= 9 else 12.0
-        rv30d = np.std(returns[-30:]) * np.sqrt(252) * 100 if len(returns) >= 30 else 11.0
+        rv9d = np.std(returns[-9:]) * np.sqrt(252) * 100 if len(returns) >= 9 else np.nan
+        rv30d = np.std(returns[-30:]) * np.sqrt(252) * 100 if len(returns) >= 30 else np.nan
 
-        vrp_short = vix9d - rv9d
-        vrp_long = vix - rv30d
+        vrp_short = vix9d - rv9d if not np.isnan(rv9d) else np.nan
+        vrp_long = vix - rv30d if not np.isnan(rv30d) else np.nan
 
         spx = yf.Ticker("^GSPC").info.get('regularMarketPrice', 6000.0)
         return spot_ratio, ratios.tolist(), labels, vrp_short, vrp_long, round(spx, 1)
     except:
-        return 0.929, np.linspace(0.929, 0.935, 31).tolist(), ["Today"] + [f"+{d}d" for d in range(1, 31)], 6.5, 4.2, 6000.0
+        return 0.929, np.linspace(0.929, 0.935, 31).tolist(), ["Today"] + [f"+{d}d" for d in range(1, 31)], np.nan, np.nan, 6000.0
 
 spot_ratio, daily_ratios, daily_labels, vrp_short, vrp_long, spx_price = get_data()
 now_str = datetime.now().strftime("%b %d, %H:%M ET")
@@ -73,7 +73,7 @@ def get_regime(r):
 regime = get_regime(spot_ratio)
 
 # ================================
-# HEADER + DAILY FORWARD + VRP METRICS (FIXED)
+# HEADER + DAILY FORWARD + VRP METRICS (SAFE DISPLAY)
 # ================================
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
@@ -119,9 +119,9 @@ st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 # ================================
 if regime["alert"]:
     st.error("NUCLEAR ALERT — MAX SIZE DIAGONALS RIGHT NOW")
-elif vrp_short > 8:
+elif not np.isnan(vrp_short) and vrp_short > 8:
     st.success("High Short VRP — Strong crush expected on short leg")
-elif vrp_short < 2:
+elif not np.isnan(vrp_short) and vrp_short < 2:
     st.warning("Low Short VRP — Crush weak, consider skipping")
 else:
     st.info("Normal VRP — Trade as usual")
