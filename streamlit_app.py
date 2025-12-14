@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.34 — FIXED VRP/SPX + SQUARE GRAPH", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.35 — CLEAN GRAPH", layout="wide")
 
 # ================================
 # STYLE
@@ -21,7 +21,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ================================
-# LIVE + DAILY FORWARD + DUAL VRP (FIXED)
+# LIVE + DAILY FORWARD + DUAL VRP (SAFE)
 # ================================
 @st.cache_data(ttl=60)
 def get_data():
@@ -42,7 +42,7 @@ def get_data():
         ratios = spot_ratio + (forward_30d - spot_ratio) * (3*t**2 - 2*t**3)
         labels = ["Today"] + [f"+{d}d" for d in range(1, 31)]
 
-        # Realized Volatility (RV) — increased period to 90d for safety
+        # Realized Volatility (RV) — 90d for safety
         spx_hist = yf.download("^GSPC", period="90d", progress=False)['Close']
         returns = np.log(spx_hist / spx_hist.shift(1)).dropna()
         rv9d = np.std(returns[-9:]) * np.sqrt(252) * 100 if len(returns) >= 9 else np.nan
@@ -51,7 +51,7 @@ def get_data():
         vrp_short = vix9d - rv9d if not np.isnan(rv9d) else np.nan
         vrp_long = vix - rv30d if not np.isnan(rv30d) else np.nan
 
-        # SPX price — fallback to download if info fails
+        # SPX price fallback
         try:
             spx = yf.Ticker("^GSPC").info.get('regularMarketPrice', np.nan)
         except:
@@ -81,7 +81,7 @@ def get_regime(r):
 regime = get_regime(spot_ratio)
 
 # ================================
-# HEADER + DAILY FORWARD + VRP METRICS (SAFE DISPLAY)
+# HEADER + VRP METRICS
 # ================================
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
@@ -98,37 +98,43 @@ with c4:
 with c5:
     st.markdown(f'<div class="header-card"><p class="small">SPX Live</p><p class="big">{spx_price:,.0f}</p><p class="small">{now_str}</p></div>', unsafe_allow_html=True)
 
-# Daily forward graph
-ymin, ymax = min(daily_ratios) - 0.03, max(daily_ratios) + 0.03
+# ================================
+# DAILY FORWARD GRAPH — CLEANER & LESS SQUISHED
+# ================================
+ymin, ymax = min(daily_ratios) - 0.04, max(daily_ratios) + 0.04
 fig = go.Figure()
 fig.add_trace(go.Scatter(
     x=daily_labels, y=daily_ratios,
-    mode='lines+markers+text',
-    line=dict(color='#60a5fa', width=7),
-    marker=dict(size=14),
-    text=[f"{r:.3f}" for r in daily_ratios[::4]],
-    textposition="top center",
-    textfont=dict(size=13, color="#e2e8f0")
+    mode='lines+markers',
+    line=dict(color='#60a5fa', width=5),  # Slightly thinner line
+    marker=dict(size=10),                 # Smaller markers
+    hovertemplate='%{x}: %{y:.3f}<extra></extra>'
 ))
 fig.add_hline(y=1.0, line_dash="dash", line_color="#e11d48", annotation_text="1.00")
 fig.update_layout(
     title="Daily Forward 9D/30D Curve — Next 30 Days",
-    height=360,
-    margin=dict(l=30,r=30,t=60,b=30),
+    height=450,  # Taller for more vertical breathing room
+    margin=dict(l=40, r=40, t=60, b=40),
     paper_bgcolor="#1e293b", plot_bgcolor="#1e293b",
     font_color="#e2e8f0",
     yaxis=dict(range=[ymin, ymax], dtick=0.01, gridcolor="#334155"),
-    xaxis=dict(tickangle=45, showgrid=False)
+    xaxis=dict(
+        tickangle=45,
+        showgrid=False,
+        tickmode='array',
+        tickvals=daily_labels[::5],      # Every 5 days for spacing
+        ticktext=daily_labels[::5]
+    )
 )
 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
 # ================================
-# ALERTS (enhanced with VRP)
+# ALERTS
 # ================================
 if regime["alert"]:
     st.error("NUCLEAR ALERT — MAX SIZE DIAGONALS RIGHT NOW")
 elif not np.isnan(vrp_short) and vrp_short > 8:
-    st.success("High Short VRP — Strong crush expected on short leg")
+    st.success("High Short VRP — Strong crush expected")
 elif not np.isnan(vrp_short) and vrp_short < 2:
     st.warning("Low Short VRP — Crush weak, consider skipping")
 else:
@@ -225,4 +231,4 @@ if st.button("RUN MONTE CARLO", use_container_width=True):
             st.metric("95th Percentile", f"${np.percentile(finals,95)/1e6:.2f}M")
             st.metric("Ruin Rate", f"{(finals<10000).mean():.2%}")
 
-st.caption("SPX Diagonal Engine v6.9.34 — DAILY Forward + Live Dual VRP • Full Table • Full MC • Dec 2025")
+st.caption("SPX Diagonal Engine v6.9.35 — CLEAN GRAPH + VRP + DAILY Forward • Dec 2025")
