@@ -73,7 +73,7 @@ def get_regime(r):
 regime = get_regime(spot_ratio)
 
 # ================================
-# HEADER + DAILY FORWARD + VRP METRICS
+# HEADER + DAILY FORWARD + VRP METRICS (FIXED)
 # ================================
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
@@ -82,9 +82,11 @@ with c2:
     alert_class = 'nuclear' if regime["alert"] else ''
     st.markdown(f'<div class="header-card {alert_class}"><p class="small">Regime</p><p class="big">{regime["zone"]}</p></div>', unsafe_allow_html=True)
 with c3:
-    st.markdown(f'<div class="header-card"><p class="small">Short VRP</p><p class="big">{vrp_short:+.1f}</p><p class="small">VIX9D - 9d RV</p></div>', unsafe_allow_html=True)
+    vrp_short_str = f"{vrp_short:+.1f}" if not np.isnan(vrp_short) else "N/A"
+    st.markdown(f'<div class="header-card"><p class="small">Short VRP</p><p class="big">{vrp_short_str}</p><p class="small">VIX9D - 9d RV</p></div>', unsafe_allow_html=True)
 with c4:
-    st.markdown(f'<div class="header-card"><p class="small">Long VRP</p><p class="big">{vrp_long:+.1f}</p><p class="small">VIX - 30d RV</p></div>', unsafe_allow_html=True)
+    vrp_long_str = f"{vrp_long:+.1f}" if not np.isnan(vrp_long) else "N/A"
+    st.markdown(f'<div class="header-card"><p class="small">Long VRP</p><p class="big">{vrp_long_str}</p><p class="small">VIX - 30d RV</p></div>', unsafe_allow_html=True)
 with c5:
     st.markdown(f'<div class="header-card"><p class="small">SPX Live</p><p class="big">{spx_price:,.0f}</p><p class="small">{now_str}</p></div>', unsafe_allow_html=True)
 
