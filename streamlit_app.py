@@ -4,15 +4,15 @@ import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime
 
-st.set_page_config(page_title("SPX Diagonal Engine v6.9.32 — FINAL")
-st.set_page_config(layout="wide")
+# Fixed: single set_page_config call
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.32 — FINAL", layout="wide")
 
 # ================================
 # STYLE
 # ================================
 st.markdown("""
 <style>
-    .header-card {background:#1e293b; border:1px solid #334155; border-radius:12px; padding:12px; 
+    .header-card {background:#1e293b; border:1px solid #334155; border-radius:12px; padding:12px;
                   text-align:center; height:135px; display:flex; flex-direction:column; justify-content:center;}
     .big {font-size:34px; font-weight:700; margin:4px 0; color:white;}
     .small {font-size:12px; color:#94a3b8; margin:0;}
@@ -28,20 +28,17 @@ st.markdown("""
 def get_daily_forward_curve():
     try:
         vix9d = yf.Ticker("^VIX9D").info.get('regularMarketPrice', 18.4)
-        vix   = yf.Ticker("^VIX").info.get('regularMarketPrice', 18.1)
+        vix = yf.Ticker("^VIX").info.get('regularMarketPrice', 18.1)
         spot_ratio = round(vix9d / vix, 3) if vix > 0 else 0.929
-
         # UPDATE THIS ONE LINE EVERY MONTH
-        next_future = "VXZ25"                    # Dec 2025 → Jan 2026 = VXF26
+        next_future = "VXZ25" # Dec 2025 → Jan 2026 = VXF26
         fut_price = yf.Ticker(next_future).info.get('regularMarketPrice', vix * 1.02)
         forward_30d = round(vix / fut_price, 3)
-
         # Daily smooth interpolation
         days = np.arange(0, 31)
         t = days / 30
         ratios = spot_ratio + (forward_30d - spot_ratio) * (3*t**2 - 2*t**3)
         labels = ["Today"] + [f"+{d}d" for d in range(1, 31)]
-
         spx = yf.Ticker("^GSPC").info.get('regularMarketPrice', 6000.0)
         return spot_ratio, ratios.tolist(), labels, round(spx, 1)
     except:
@@ -57,12 +54,12 @@ now_str = datetime.now().strftime("%b %d, %H:%M ET")
 # REGIME
 # ================================
 def get_regime(r):
-    if r >= 1.12: return {"zone":"MAXIMUM",  "shrink":2,  "alert":True}
-    if r >= 1.04: return {"zone":"ENHANCED", "shrink":5,  "alert":True}
-    if r >= 0.94: return {"zone":"OPTIMAL",   "shrink":8,  "alert":False}
+    if r >= 1.12: return {"zone":"MAXIMUM", "shrink":2, "alert":True}
+    if r >= 1.04: return {"zone":"ENHANCED", "shrink":5, "alert":True}
+    if r >= 0.94: return {"zone":"OPTIMAL", "shrink":8, "alert":False}
     if r >= 0.88: return {"zone":"ACCEPTABLE","shrink":12, "alert":False}
-    if r >= 0.84: return {"zone":"MARGINAL",  "shrink":32, "alert":False}
-    return                {"zone":"OFF",       "shrink":60, "alert":False}
+    if r >= 0.84: return {"zone":"MARGINAL", "shrink":32, "alert":False}
+    return {"zone":"OFF", "shrink":60, "alert":False}
 
 regime = get_regime(spot_ratio)
 
@@ -121,7 +118,7 @@ left, right = st.columns(2)
 with left:
     st.subheader("Strategy Parameters")
     debit = st.number_input("Current Debit ($)", 100, 5000, 1350, 10)
-    winrate_pct = st.slider("Win Rate (%)", 0, 100, 96, 1)        # 0–100 whole numbers
+    winrate_pct = st.slider("Win Rate (%)", 0, 100, 96, 1)  # 0–100 whole numbers
     winrate = winrate_pct / 100
     winner = st.number_input("Theoretical Winner ($)", value=230, step=5)
     loser = st.number_input("Average Loser ($)", value=-1206, step=25)
@@ -152,15 +149,14 @@ m5.metric("Shrink", f"{regime['shrink']}%")
 with st.expander("Sacred 9D/30D Performance Table (2020–Nov 2025) — Your Legend", expanded=True):
     st.markdown("""
 **Realised | 8–9 DTE short 0.25% OTM put → 16–18 DTE –20 wide long**
-
-| 9D/30D Ratio     | Typical debit       | Realised winner       | Model Winner | Realised Edge/$ | Verdict                |
+| 9D/30D Ratio | Typical debit | Realised winner | Model Winner | Realised Edge/$ | Verdict |
 |------------------|---------------------|------------------------|--------------|------------------|------------------------|
-| ≥ 1.12           | $550 – $1,100       | $285 – $355            | $224+        | 0.30x+           | **MAXIMUM / NUCLEAR**  |
-| 1.04 – 1.119     | $750 – $1,150       | $258 – $292            | $220         | 0.24x–0.30x      | **ENHANCED**           |
-| 0.94 – 1.039     | $1,050 – $1,550     | $225 – $275            | $208         | 0.19x–0.23x      | **OPTIMAL**            |
-| 0.88 – 0.939     | $1,400 – $1,750     | $215 – $245            | $195         | 0.13x–0.16x      | **ACCEPTABLE**         |
-| 0.84 – 0.879     | $1,650 – $2,100     | $185 – $220            | $180         | 0.10x–0.12x      | **MARGINAL**           |
-| ≤ 0.839          | $2,000 – $2,800     | $110 – $170            | $110         | ≤ 0.07x          | **OFF**                |
+| ≥ 1.12 | $550 – $1,100 | $285 – $355 | $224+ | 0.30x+ | **MAXIMUM / NUCLEAR** |
+| 1.04 – 1.119 | $750 – $1,150 | $258 – $292 | $220 | 0.24x–0.30x | **ENHANCED** |
+| 0.94 – 1.039 | $1,050 – $1,550 | $225 – $275 | $208 | 0.19x–0.23x | **OPTIMAL** |
+| 0.88 – 0.939 | $1,400 – $1,750 | $215 – $245 | $195 | 0.13x–0.16x | **ACCEPTABLE** |
+| 0.84 – 0.879 | $1,650 – $2,100 | $185 – $220 | $180 | 0.10x–0.12x | **MARGINAL** |
+| ≤ 0.839 | $2,000 – $2,800 | $110 – $170 | $110 | ≤ 0.07x | **OFF** |
     """, unsafe_allow_html=True)
 
 # ================================
@@ -185,10 +181,10 @@ if st.button("RUN MONTE CARLO", use_container_width=True):
                 path.append(bal)
             finals.append(bal)
             all_paths.append(path)
-        
+       
         finals = np.array(finals)
         mean_path = np.mean(all_paths, axis=0)
-        
+       
         col1, col2 = st.columns([3, 1])
         with col1:
             fig = go.Figure()
@@ -203,4 +199,4 @@ if st.button("RUN MONTE CARLO", use_container_width=True):
             st.metric("95th Percentile", f"${np.percentile(finals,95)/1e6:.2f}M")
             st.metric("Ruin Rate", f"{(finals<10000).mean():.2%}")
 
-st.caption("SPX Diagonal Engine v6.9.32 — FINAL • Daily Forward • Full Table • Full MC • Dec 2025 2025")
+st.caption("SPX Diagonal Engine v6.9.32 — FINAL • Daily Forward • Full Table • Full MC • Dec 2025")
