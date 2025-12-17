@@ -7,7 +7,7 @@ import requests
 import xml.etree.ElementTree as ET
 from dateutil import parser
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.37 — NEWS FEED", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.38 — CLEAN NEWS", layout="wide")
 
 # ================================
 # STYLE
@@ -112,7 +112,7 @@ else:
 st.markdown("---")
 
 # ================================
-# TODAY'S MARKET MOVERS NEWS FEED
+# TODAY'S MARKET MOVERS NEWS FEED (CLEANED)
 # ================================
 @st.cache_data(ttl=300)  # Refresh every 5 minutes
 def get_market_news():
@@ -122,18 +122,25 @@ def get_market_news():
         response = requests.get(url, timeout=10)
         root = ET.fromstring(response.content)
         articles = []
-        for item in root.findall(".//item")[:20]:
-            title = item.find("title").text or ""
-            link = item.find("link").text or ""
-            pub_date_str = item.find("pubDate").text or ""
+        for item in root.findall(".//item")[:30]:
+            title_elem = item.find("title")
+            link_elem = item.find("link")
+            pub_date_elem = item.find("pubDate")
+            source_elem = item.find(".//source")
+            if title_elem is None or link_elem is None: continue
+            title = title_elem.text or ""
+            link = link_elem.text or ""
+            pub_date_str = pub_date_elem.text if pub_date_elem is not None else ""
             pub_date = parser.parse(pub_date_str) if pub_date_str else datetime.now()
-            description = item.find("description").text or ""
-            if any(kw in title.lower() for kw in ["s&p", "spx", "nasdaq", "dow", "fed", "market"]):
+            source = source_elem.text if source_elem is not None else "Unknown"
+            # Clean title (remove trailing source)
+            clean_title = title.split(" - ")[0]
+            if any(kw in title.lower() for kw in ["s&p", "spx", "nasdaq", "dow", "fed", "market", "stocks"]):
                 articles.append({
-                    "title": title,
+                    "title": clean_title,
                     "link": link,
                     "time": pub_date.strftime("%H:%M"),
-                    "desc": (description[:200] + "...") if len(description) > 200 else description
+                    "source": source
                 })
         articles.sort(key=lambda x: x["time"], reverse=True)
         return articles[:4]
@@ -145,8 +152,8 @@ news = get_market_news()
 with st.expander("Today's Market Movers News (Top 4 Relevant)", expanded=True):
     if news:
         for article in news:
-            st.markdown(f"**[{article['title']}]({article['link']})** — {article['time']}")
-            st.caption(article['desc'])
+            st.markdown(f"**[{article['title']}]({article['link']})**")
+            st.caption(f"{article['source']} — {article['time']}")
             st.markdown("---")
     else:
         st.info("No relevant news found or loading... (refreshes every 5 min)")
@@ -241,4 +248,4 @@ if st.button("RUN MONTE CARLO", use_container_width=True):
             st.metric("95th Percentile", f"${np.percentile(finals,95)/1e6:.2f}M")
             st.metric("Ruin Rate", f"{(finals<10000).mean():.2%}")
 
-st.caption("SPX Diagonal Engine v6.9.37 — NEWS FEED ADDED • Daily Forward • Full Table • Full MC • Dec 2025")
+st.caption("SPX Diagonal Engine v6.9.38 — CLEAN NEWS FEED • Daily Forward • Full Table • Full MC • Dec 2025")
