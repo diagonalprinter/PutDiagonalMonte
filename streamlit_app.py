@@ -2,12 +2,12 @@ import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 import yfinance as yf
-from datetime import datetime
+from datetime import datetime, date
 import requests
 import xml.etree.ElementTree as ET
 from dateutil import parser
 
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.38 — CLEAN NEWS", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.39 — TODAY'S NEWS ONLY", layout="wide")
 
 # ================================
 # STYLE
@@ -112,12 +112,13 @@ else:
 st.markdown("---")
 
 # ================================
-# TODAY'S MARKET MOVERS NEWS FEED (CLEANED)
+# TODAY'S MARKET MOVERS NEWS FEED (TODAY ONLY)
 # ================================
 @st.cache_data(ttl=300)  # Refresh every 5 minutes
 def get_market_news():
     try:
-        query = "S%26P+500+OR+SPX+OR+Nasdaq+market+move+OR+up+OR+down+OR+gains+OR+drops+OR+Fed"
+        today = date.today().strftime("%Y-%m-%d")
+        query = f"S%26P+500+OR+SPX+OR+Nasdaq+market+move+OR+up+OR+down+OR+gains+OR+drops+OR+Fed+after:{today}"
         url = f"https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
         response = requests.get(url, timeout=10)
         root = ET.fromstring(response.content)
@@ -133,7 +134,7 @@ def get_market_news():
             pub_date_str = pub_date_elem.text if pub_date_elem is not None else ""
             pub_date = parser.parse(pub_date_str) if pub_date_str else datetime.now()
             source = source_elem.text if source_elem is not None else "Unknown"
-            # Clean title (remove trailing source)
+            # Clean title
             clean_title = title.split(" - ")[0]
             if any(kw in title.lower() for kw in ["s&p", "spx", "nasdaq", "dow", "fed", "market", "stocks"]):
                 articles.append({
@@ -149,14 +150,14 @@ def get_market_news():
 
 news = get_market_news()
 
-with st.expander("Today's Market Movers News (Top 4 Relevant)", expanded=True):
+with st.expander("Today's Market Movers News (Top 4 Relevant — Today Only)", expanded=True):
     if news:
         for article in news:
             st.markdown(f"**[{article['title']}]({article['link']})**")
             st.caption(f"{article['source']} — {article['time']}")
             st.markdown("---")
     else:
-        st.info("No relevant news found or loading... (refreshes every 5 min)")
+        st.info("No relevant news for today yet (or loading...) — refreshes every 5 min")
 
 st.markdown("---")
 
@@ -248,4 +249,4 @@ if st.button("RUN MONTE CARLO", use_container_width=True):
             st.metric("95th Percentile", f"${np.percentile(finals,95)/1e6:.2f}M")
             st.metric("Ruin Rate", f"{(finals<10000).mean():.2%}")
 
-st.caption("SPX Diagonal Engine v6.9.38 — CLEAN NEWS FEED • Daily Forward • Full Table • Full MC • Dec 2025")
+st.caption("SPX Diagonal Engine v6.9.39 — TODAY'S NEWS ONLY • Clean Feed • Daily Forward • Full Table • Full MC • Dec 2025")
