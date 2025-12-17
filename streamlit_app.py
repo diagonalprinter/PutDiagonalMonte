@@ -3,9 +3,11 @@ import numpy as np
 import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime
+import requests
+import xml.etree.ElementTree as ET
+from dateutil import parser
 
-# Fixed: single set_page_config call
-st.set_page_config(page_title="SPX Diagonal Engine v6.9.32 — FINAL", layout="wide")
+st.set_page_config(page_title="SPX Diagonal Engine v6.9.37 — NEWS FEED", layout="wide")
 
 # ================================
 # STYLE
@@ -30,11 +32,9 @@ def get_daily_forward_curve():
         vix9d = yf.Ticker("^VIX9D").info.get('regularMarketPrice', 18.4)
         vix = yf.Ticker("^VIX").info.get('regularMarketPrice', 18.1)
         spot_ratio = round(vix9d / vix, 3) if vix > 0 else 0.929
-        # UPDATE THIS ONE LINE EVERY MONTH
-        next_future = "VXZ25" # Dec 2025 → Jan 2026 = VXF26
+        next_future = "VXZ25"  # ← UPDATE THIS ONE LINE EVERY MONTH (Jan 2026 = VXF26)
         fut_price = yf.Ticker(next_future).info.get('regularMarketPrice', vix * 1.02)
         forward_30d = round(vix / fut_price, 3)
-        # Daily smooth interpolation
         days = np.arange(0, 31)
         t = days / 30
         ratios = spot_ratio + (forward_30d - spot_ratio) * (3*t**2 - 2*t**3)
@@ -112,13 +112,55 @@ else:
 st.markdown("---")
 
 # ================================
+# TODAY'S MARKET MOVERS NEWS FEED
+# ================================
+@st.cache_data(ttl=300)  # Refresh every 5 minutes
+def get_market_news():
+    try:
+        query = "S%26P+500+OR+SPX+OR+Nasdaq+market+move+OR+up+OR+down+OR+gains+OR+drops+OR+Fed"
+        url = f"https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
+        response = requests.get(url, timeout=10)
+        root = ET.fromstring(response.content)
+        articles = []
+        for item in root.findall(".//item")[:20]:
+            title = item.find("title").text or ""
+            link = item.find("link").text or ""
+            pub_date_str = item.find("pubDate").text or ""
+            pub_date = parser.parse(pub_date_str) if pub_date_str else datetime.now()
+            description = item.find("description").text or ""
+            if any(kw in title.lower() for kw in ["s&p", "spx", "nasdaq", "dow", "fed", "market"]):
+                articles.append({
+                    "title": title,
+                    "link": link,
+                    "time": pub_date.strftime("%H:%M"),
+                    "desc": (description[:200] + "...") if len(description) > 200 else description
+                })
+        articles.sort(key=lambda x: x["time"], reverse=True)
+        return articles[:4]
+    except:
+        return []
+
+news = get_market_news()
+
+with st.expander("Today's Market Movers News (Top 4 Relevant)", expanded=True):
+    if news:
+        for article in news:
+            st.markdown(f"**[{article['title']}]({article['link']})** — {article['time']}")
+            st.caption(article['desc'])
+            st.markdown("---")
+    else:
+        st.info("No relevant news found or loading... (refreshes every 5 min)")
+
+st.markdown("---")
+
+# ================================
 # INPUTS & CALCULATIONS
 # ================================
 left, right = st.columns(2)
 with left:
     st.subheader("Strategy Parameters")
     debit = st.number_input("Current Debit ($)", 100, 5000, 1350, 10)
-    winrate_pct = st.slider("Win Rate (%)", 0, 100, 96, 1)  # 0–100 whole numbers
+    winrate_pct = st.slider("Win Rate (%)", 0, 100, 96, 1)
     winrate = winrate_pct / 100
     winner = st.number_input("Theoretical Winner ($)", value=230, step=5)
     loser = st.number_input("Average Loser ($)", value=-1206, step=25)
@@ -181,10 +223,10 @@ if st.button("RUN MONTE CARLO", use_container_width=True):
                 path.append(bal)
             finals.append(bal)
             all_paths.append(path)
-       
+        
         finals = np.array(finals)
         mean_path = np.mean(all_paths, axis=0)
-       
+        
         col1, col2 = st.columns([3, 1])
         with col1:
             fig = go.Figure()
@@ -199,4 +241,4 @@ if st.button("RUN MONTE CARLO", use_container_width=True):
             st.metric("95th Percentile", f"${np.percentile(finals,95)/1e6:.2f}M")
             st.metric("Ruin Rate", f"{(finals<10000).mean():.2%}")
 
-st.caption("SPX Diagonal Engine v6.9.32 — FINAL • Daily Forward • Full Table • Full MC • Dec 2025")
+st.caption("SPX Diagonal Engine v6.9.37 — NEWS FEED ADDED • Daily Forward • Full Table • Full MC • Dec 2025")
